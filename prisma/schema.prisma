@@ -3,15 +3,71 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Replace with your PostgreSQL connection string
 }
 
-model Organization {
-  id           Int      @id @default(autoincrement())
-  clientId     String   @unique @map("client_id")
-  clientSecret String   @map("client_secret")
-  name         String?
-  createdAt    DateTime @default(now()) @map("created_at")
+model User {
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
+  name      String
+  password  String // Encrypted password
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  consents  Consent[] // Relation to user consents
+  sessions  Session[] // Relation to user sessions
+  AuditLog  AuditLog[]
+}
+
+model Consent {
+  id             Int           @id @default(autoincrement())
+  userId         Int // Foreign key to User
+  user           User          @relation(fields: [userId], references: [id])
+  dataProviderId Int // Foreign key to DataProvider
+  dataProvider   DataProvider  @relation(fields: [dataProviderId], references: [id])
+  scope          String // Comma-separated list of scopes (e.g., "accounts,transactions")
+  issuedAt       DateTime      @default(now())
+  expiresAt      DateTime
+  isRevoked      Boolean       @default(false)
+  accessTokens   AccessToken[] // Relation to tokens issued for this consent
+}
+
+model DataProvider {
+  id           Int       @id @default(autoincrement())
+  name         String // Name of the data provider (e.g., Shinhan Bank)
+  apiBaseUrl   String // Base URL for the provider's API
+  clientId     String // Client ID for the provider's API
+  clientSecret String // Client secret for the provider's API
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  consents     Consent[] // Relation to user consents
+}
+
+model AccessToken {
+  id        Int      @id @default(autoincrement())
+  consentId Int // Foreign key to Consent
+  consent   Consent  @relation(fields: [consentId], references: [id])
+  token     String // Encrypted or hashed access token
+  expiresAt DateTime
+  issuedAt  DateTime @default(now())
+  isRevoked Boolean  @default(false)
+}
+
+model Session {
+  id        Int      @id @default(autoincrement())
+  userId    Int // Foreign key to User
+  user      User     @relation(fields: [userId], references: [id])
+  token     String // Session token
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isActive  Boolean  @default(true)
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int? // Optional foreign key to User
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String // e.g., "DATA_REQUEST", "TOKEN_ISSUED", "CONSENT_REVOKED"
+  description String // Detailed information about the action
+  createdAt   DateTime @default(now())
 }
