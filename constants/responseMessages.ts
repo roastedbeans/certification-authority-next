@@ -29,6 +29,10 @@ export const ResponseCodes = {
 		code: '1002',
 		message: 'Access token is missing',
 	},
+	INVALID_API_TRAN_ID: {
+		code: '1003',
+		message: 'Invalid or missing x-api-tran-id',
+	},
 
 	// Validation errors (2000-2999)
 	INVALID_PARAMETERS: {
