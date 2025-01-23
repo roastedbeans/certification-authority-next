@@ -3,71 +3,118 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL") // Replace with your PostgreSQL connection string
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  opType      String
+  orgCode     String       @unique
+  orgType     String
+  authType    String
+  industry    String
+  serialNum   String       @unique @default(cuid())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  oAuthClient OAuthClient?
+  users       User?
 }
 
 model User {
-  id        Int        @id @default(autoincrement())
-  email     String     @unique
-  name      String
-  password  String // Encrypted password
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  consents  Consent[] // Relation to user consents
-  sessions  Session[] // Relation to user sessions
-  AuditLog  AuditLog[]
+  id             String       @id @default(uuid())
+  name           String       @unique
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String       @unique
+  certificates   Certificate?
+  logs           Log?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Certificate {
+  id                String          @id @default(uuid())
+  serialNumber      String          @unique @default(cuid())
+  certTxId          String          @unique
+  signTxId          String          @unique
+  phoneNumber       String          @unique
+  userId            String          @unique
+  userCI            String
+  requestTitle      String
+  consentList       Consent[]
+  consentType       Int
+  deviceCode        String
+  deviceBrowser     String
+  signedConsentList SignedConsent[]
+  issuedAt          DateTime        @default(now())
+  expiresAt         DateTime
+  revoked           Boolean         @default(false)
+  revokedAt         DateTime?
+  revocationReason  String?
+  user              User            @relation(fields: [userId], references: [id])
+  logs              Log?
+  revocationEntries Revocation[]
 }
 
 model Consent {
-  id             Int           @id @default(autoincrement())
-  userId         Int // Foreign key to User
-  user           User          @relation(fields: [userId], references: [id])
-  dataProviderId Int // Foreign key to DataProvider
-  dataProvider   DataProvider  @relation(fields: [dataProviderId], references: [id])
-  scope          String // Comma-separated list of scopes (e.g., "accounts,transactions")
-  issuedAt       DateTime      @default(now())
-  expiresAt      DateTime
-  isRevoked      Boolean       @default(false)
-  accessTokens   AccessToken[] // Relation to tokens issued for this consent
+  id            String       @id @default(uuid())
+  txId          String       @unique
+  consentTitle  String
+  consent       String
+  consentLen    Int
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  Certificate   Certificate? @relation(fields: [certificateId], references: [id])
+  certificateId String?      @unique
 }
 
-model DataProvider {
-  id           Int       @id @default(autoincrement())
-  name         String // Name of the data provider (e.g., Shinhan Bank)
-  apiBaseUrl   String // Base URL for the provider's API
-  clientId     String // Client ID for the provider's API
-  clientSecret String // Client secret for the provider's API
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  consents     Consent[] // Relation to user consents
+model SignedConsent {
+  id               String       @id @default(uuid())
+  txId             String       @unique
+  signedConsent    String
+  signedConsentLen Int
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  Certificate      Certificate? @relation(fields: [certificateId], references: [id])
+  certificateId    String?      @unique
 }
 
-model AccessToken {
-  id        Int      @id @default(autoincrement())
-  consentId Int // Foreign key to Consent
-  consent   Consent  @relation(fields: [consentId], references: [id])
-  token     String // Encrypted or hashed access token
-  expiresAt DateTime
-  issuedAt  DateTime @default(now())
-  isRevoked Boolean  @default(false)
+model Revocation {
+  id            String      @id @default(uuid())
+  certificateId String
+  revokedAt     DateTime    @default(now())
+  reason        String?
+  certificate   Certificate @relation(fields: [certificateId], references: [id])
 }
 
-model Session {
-  id        Int      @id @default(autoincrement())
-  userId    Int // Foreign key to User
-  user      User     @relation(fields: [userId], references: [id])
-  token     String // Session token
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  isActive  Boolean  @default(true)
+model CertificateAuthority {
+  id              String   @id @default(uuid())
+  name            String
+  privateKey      String
+  publicKey       String
+  certificateData String
+  createdAt       DateTime @default(now())
 }
 
-model AuditLog {
-  id          Int      @id @default(autoincrement())
-  userId      Int? // Optional foreign key to User
-  user        User?    @relation(fields: [userId], references: [id])
-  action      String // e.g., "DATA_REQUEST", "TOKEN_ISSUED", "CONSENT_REVOKED"
-  description String // Detailed information about the action
-  createdAt   DateTime @default(now())
+model OAuthClient {
+  id             String       @id @default(uuid())
+  clientId       String       @unique
+  clientSecret   String       @unique
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Log {
+  id            String       @id @default(uuid())
+  userId        String       @unique
+  certificateId String?      @unique
+  action        String
+  timestamp     DateTime     @default(now())
+  details       String?
+  certificate   Certificate? @relation(fields: [certificateId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
 }

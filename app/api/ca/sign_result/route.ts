@@ -2,23 +2,15 @@
 
 import { getResponseMessage } from '@/constants/responseMessages';
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { createSignatureResponse, generateTxId } from '@/utils/signatureGenerator';
+import { createSignedConsentList } from '@/utils/signatureGenerator';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // Types for the request body
 interface SignResultRequestBody {
 	cert_tx_id: string; // Certificate Authority Transaction ID
 	sign_tx_id: string; // Signature Request Transaction ID
-}
-
-// Types for API response
-interface SignResultResponse {
-	status: 'success' | 'error';
-	message: string;
-	data?: {
-		cert_tx_id: string;
-		sign_tx_id: string;
-	};
 }
 
 const validateAuthorizationHeader = (header: string | null): boolean => {
@@ -50,31 +42,55 @@ export async function POST(request: NextRequest) {
 
 		// 2. Parse and validate body
 		const body: SignResultRequestBody = await request.json();
+		const { cert_tx_id, sign_tx_id } = body;
 
-		if (!body.cert_tx_id || body.cert_tx_id.length !== 40) {
+		if (!cert_tx_id || cert_tx_id.length !== 40) {
 			return NextResponse.json(getResponseMessage('INVALID_CERT_TX_ID'), { status: 400 });
 		}
 
-		if (!body.sign_tx_id || body.sign_tx_id.length !== 49) {
+		if (!sign_tx_id || sign_tx_id.length !== 49) {
 			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
 		}
 
-		// Generate signature
-		const { signed_consent, signed_consent_len } = createSignatureResponse(body.cert_tx_id, body.sign_tx_id);
+		// 3. Fetch consent list from the database
+		const certificate = await prisma.certificate.findUnique({
+			where: {
+				certTxId: cert_tx_id,
+			},
+			select: {
+				id: true,
+				signTxId: true,
+				consentList: true,
+			},
+		});
+
+		if (!certificate) {
+			return NextResponse.json(getResponseMessage('NO_CERTIFICATE_FOUND'), { status: 404 });
+		}
+
+		// 4. Check if sign_tx_id matches the certificate sign_tx_id
+		if (certificate.signTxId !== sign_tx_id) {
+			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
+		}
+
+		const privateKey = process.env.CA_PRIVATE_KEY || 'certification-authority-private-key';
+
+		const signedConsentList = createSignedConsentList(certificate.consentList, privateKey);
+		console.log('Signed consent list:', signedConsentList);
+
+		const updateCertificate = await prisma.signedConsent.updateMany({
+			where: {
+				certificateId: certificate.id,
+			},
+			data: [signedConsentList],
+		});
+
+		console.log('Certificate updated with signature:', updateCertificate);
 
 		const successResponse = {
 			rsp_code: getResponseMessage('SUCCESS').code,
 			rsp_msg: getResponseMessage('SUCCESS').message,
-			signed_consent_cnt: 1,
-			signed_consent_list: [
-				{
-					tx_id: generateTxId(),
-					signed_consent: signed_consent, // Base64 encoded signature
-				},
-			],
-			signed_consent_len: signed_consent_len, // Example length
-			signed_consent: signed_consent, // Base64 encoded signature
-			tx_id: generateTxId(),
+			signed_consent_list: signedConsentList,
 		};
 
 		return NextResponse.json(successResponse, {

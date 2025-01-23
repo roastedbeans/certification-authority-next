@@ -18,27 +18,25 @@ export async function POST(req: Request) {
 
 		// Parse body
 		const body = await req.formData();
-		const grantType = body.get('grant_type');
-		const clientId = body.get('client_id');
-		const clientSecret = body.get('client_secret');
+		const grant_type = body.get('grant_type');
+		const client_id = body.get('client_id');
+		const client_secret = body.get('client_secret');
 		const scope = body.get('scope');
 
 		// Validate body parameters
-		if (grantType !== 'client_credential' || !clientId || !clientSecret || scope !== 'ca') {
+		if (grant_type !== 'client_credential' || !client_id || !client_secret || scope !== 'ca') {
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		// Authenticate client using Supabase via Prisma
-		const client = await prisma.organization.findUnique({
-			where: { clientId: clientId as string },
-		});
+		const clientSecret = process.env.CLIENT_SECRET;
 
-		if (!client || client.clientSecret !== clientSecret) {
+		if (!clientSecret || clientSecret !== client_secret) {
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 401 });
 		}
 
 		// Generate JWT token
-		const token = generateAccessToken(clientId as string, scope as string);
+		const token = generateAccessToken(client_id as string, scope as string);
 
 		return NextResponse.json(
 			{
@@ -70,9 +68,5 @@ function generateAccessToken(clientId: string, scope: string): string {
 		scope: scope, // Scope of access
 	};
 
-	const options = {
-		expiresIn: '1h', // Token validity period
-	};
-
-	return jwt.sign(payload, JWT_SECRET, options);
+	return jwt.sign(payload, JWT_SECRET);
 }

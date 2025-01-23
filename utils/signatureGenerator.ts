@@ -1,9 +1,10 @@
 // app/api/utils/signatureGenerator.ts
 import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 
 interface SignatureInput {
-	cert_tx_id: string;
-	sign_tx_id: string;
+	consent: string;
+	privateKey: string;
 	timestamp: string;
 }
 
@@ -12,8 +13,7 @@ export function generateSignature(data: SignatureInput): string {
 	const signaturePayload = {
 		type: 'SignedConsent',
 		version: '1.0',
-		cert_tx_id: data.cert_tx_id,
-		sign_tx_id: data.sign_tx_id,
+		sign_tx_id: data.privateKey,
 		timestamp: data.timestamp,
 	};
 
@@ -25,20 +25,32 @@ export function generateSignature(data: SignatureInput): string {
 	return base64Signature.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// Helper function to create the full signature response
-export function createSignatureResponse(certTxId: string, signTxId: string) {
+interface Consent {
+	consentTitle: string;
+	consent: string;
+	txId: string;
+}
+
+// Helper function to create signed array of consent list
+export function createSignedConsentList(consentList: Consent[], privateKey: string) {
+	const signedConsentList = [];
 	const timestamp = new Date().toISOString();
 
-	const signedConsent = generateSignature({
-		cert_tx_id: certTxId,
-		sign_tx_id: signTxId,
-		timestamp,
-	});
+	for (const consent of consentList) {
+		const signedConsent = generateSignature({
+			consent: consent.consent,
+			privateKey: privateKey,
+			timestamp,
+		});
 
-	return {
-		signed_consent: signedConsent,
-		signed_consent_len: signedConsent.length,
-	};
+		signedConsentList.push({
+			signed_consent_len: signedConsent.length,
+			signed_consent: signedConsent,
+			tx_id: consent.txId,
+		});
+	}
+
+	return signedConsentList;
 }
 
 export function generateCertTxId() {
@@ -46,26 +58,16 @@ export function generateCertTxId() {
 		.toISOString()
 		.replace(/[-:.TZ]/g, '')
 		.slice(0, 14); // YYYYMMDDHHMMSS
-	const randomPart = Math.random().toString(36).substring(2, 12).toUpperCase(); // 10-character alphanumeric string
-	return `${timestamp}${randomPart}`.substring(0, 40); // Ensure it fits within 40 characters
+
+	const id = uuidv4().replace(/-/g, ''); // Remove dashes from UUID
+
+	return `${timestamp}${id}`.substring(0, 40); // Ensure it fits within 40 characters
 }
 
-export function generateTxId() {
-	const length = 74;
+// Function to sign transaction data (generate signature)
+export function generateTxId(action: string, timestamp: string): string {
+	// Generate 60 bytes of random data
+	const randomBytes = crypto.randomBytes(60).toString('hex');
 
-	// Generate a base UUID (e.g., "550e8400-e29b-41d4-a716-446655440000")
-	const uuid = uuidv4().replace(/-/g, ''); // Remove dashes to create a clean alphanumeric base
-
-	// Add randomness to ensure we reach exactly 74 characters
-	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-	let additionalChars = '';
-	while (additionalChars.length + uuid.length < length) {
-		const randomIndex = Math.floor(Math.random() * chars.length);
-		additionalChars += chars[randomIndex];
-	}
-
-	// Combine the UUID and additional random characters to ensure 74 characters
-	const txId = (uuid + additionalChars).slice(0, length);
-
-	return txId;
+	return `${action}_${timestamp}_${randomBytes}`.substring(0, 74); // Ensure it fits within 74 characters
 }

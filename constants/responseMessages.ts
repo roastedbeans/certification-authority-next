@@ -33,6 +33,10 @@ export const ResponseCodes = {
 		code: '1003',
 		message: 'Invalid or missing x-api-tran-id',
 	},
+	NO_CERTIFICATE_FOUND: {
+		code: '1004',
+		message: 'No certificate found',
+	},
 
 	// Validation errors (2000-2999)
 	INVALID_PARAMETERS: {
@@ -68,6 +72,12 @@ export const ResponseCodes = {
 	DUPLICATE_TRANSACTION: {
 		code: '3002',
 		message: 'Duplicate transaction detected',
+	},
+
+	// Data not found errors (4000-4999)
+	NO_ORGANIZATION_FOUND: {
+		code: '4000',
+		message: 'No organization found',
 	},
 
 	// System errors (9000-9999)

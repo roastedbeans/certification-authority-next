@@ -24,16 +24,16 @@ export async function POST(req: Request) {
 		const scope = body.get('scope');
 
 		// Validate body parameters
-		if (grantType !== 'client_credential' || !clientId || !clientSecret || scope !== 'manage') {
+		if ((grantType as string) !== 'client_credential' || !clientId || !clientSecret || (scope as string) !== 'manage') {
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		// Authenticate client using Supabase via Prisma
-		const client = await prisma.organization.findUnique({
+		const client = await prisma.oAuthClient.findUnique({
 			where: { clientId: clientId as string },
 		});
 
-		if (!client || client.clientSecret !== clientSecret) {
+		if (!client || client.clientSecret !== (clientSecret as string)) {
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 401 });
 		}
 
@@ -71,9 +71,5 @@ function generateAccessToken(clientId: string, scope: string): string {
 		scope: scope, // Scope of access
 	};
 
-	const options = {
-		expiresIn: '1h', // Token validity period
-	};
-
-	return jwt.sign(payload, JWT_SECRET, options);
+	return jwt.sign(payload, JWT_SECRET);
 }
