@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getResponseMessage } from '@/constants/responseMessages';
-import { createSignedConsentList, generateCertTxId, generateSignature } from '@/utils/signatureGenerator';
+import { generateCertTxId } from '@/utils/signatureGenerator';
 import { PrismaClient } from '@prisma/client';
+import { initializeCsv, logRequestToCsv } from '@/utils/generateCSV';
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secure-secret';
@@ -15,12 +16,14 @@ type Consent = {
 };
 
 export async function POST(req: Request) {
+	await initializeCsv(); // Ensure the CSV file exists
 	try {
 		const headers = req.headers;
 		const authorization = headers.get('Authorization');
 		const xApiTranId = headers.get('x-api-tran-id'); // e.g. 1234567890123456789012345
 
 		if (!authorization || !authorization.startsWith('Bearer ')) {
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('UNAUTHORIZED')));
 			return NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
 		}
 
@@ -31,11 +34,13 @@ export async function POST(req: Request) {
 		try {
 			decodedToken = jwt.verify(token, JWT_SECRET);
 		} catch (error) {
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_TOKEN')));
 			return NextResponse.json(getResponseMessage('INVALID_TOKEN'), { status: 403 });
 		}
 
 		// Validate x-api-tran-id
 		if (!xApiTranId || xApiTranId.length > 25) {
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')));
 			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
 		}
 
@@ -60,50 +65,58 @@ export async function POST(req: Request) {
 		} = body;
 
 		if (!sign_tx_id || sign_tx_id.length > 49) {
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')));
 			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
 		}
 
 		if (!user_ci || user_ci.length > 100) {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing user_ci' }, { status: 400 });
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!real_name || real_name.length > 30) {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing real_name' }, { status: 400 });
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!phone_num || phone_num.length > 15) {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing phone_num' }, { status: 400 });
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!request_title || request_title.length > 200) {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing request_title' }, { status: 400 });
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!device_code || device_code.length > 50) {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing device_code' }, { status: 400 });
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!device_browser || device_browser.length > 50) {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing device_browser' }, { status: 400 });
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!return_app_scheme_url || return_app_scheme_url.length > 200) {
-			return NextResponse.json(
-				{ rsp_code: 2000, rsp_msg: 'Invalid or missing return_app_scheme_url' },
-				{ status: 400 }
-			);
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!consent_cnt || typeof consent_cnt !== 'number') {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing consent_cnt' }, { status: 400 });
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!consent_list || (consent_list as Consent[]).length !== consent_cnt) {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing consent' }, { status: 400 });
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
-		if (!consent_type || typeof consent_type !== 'number') {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'Invalid or missing consent_type' }, { status: 400 });
+		if (!consent_type || consent_type.length > 1) {
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		const certTxId = generateCertTxId();
@@ -111,17 +124,53 @@ export async function POST(req: Request) {
 		// 1 year from now expiry date
 		const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
-		const organizationId = sign_tx_id.split('_')[0];
+		const orgCode = sign_tx_id.split('_')[0];
+		const caCode = sign_tx_id.split('_')[1];
 		const serialNumber = sign_tx_id.split('_')[3];
 
 		const userResponse = await prisma.user.create({
 			data: {
 				name: real_name,
-				organizationId: organizationId || 'default-organization-id',
+				orgCode: orgCode || 'default-organization-id',
 			},
 		});
 
-		console.log('User data added to database:', userResponse);
+		const firstName = real_name.split(' ')[0];
+		const lastName = real_name.split(' ')[1];
+
+		const accountExist = await prisma.account.findFirst({
+			where: {
+				firstName: firstName,
+				lastName: lastName,
+			},
+		});
+
+		if (!accountExist) {
+			//error
+			return NextResponse.json({ error: `Account ${firstName + ' ' + lastName} does not exist` }, { status: 400 });
+		}
+
+		const account = await prisma.account.update({
+			where: {
+				accountNum: accountExist.accountNum,
+			},
+			data: {
+				userId: userResponse.id,
+			},
+		});
+
+		const certificateAuthority = await prisma.certificateAuthority.findUnique({
+			where: {
+				caCode: caCode,
+			},
+		});
+
+		if (!certificateAuthority) {
+			return NextResponse.json(
+				{ rsp_code: 2000, rsp_msg: 'Invalid or missing certificate authority' },
+				{ status: 400 }
+			);
+		}
 
 		const certificateResponse = await prisma.certificate.create({
 			data: {
@@ -135,32 +184,39 @@ export async function POST(req: Request) {
 				consentType: consent_type,
 				deviceCode: device_code,
 				deviceBrowser: device_browser,
+				certificateAuthorityId: certificateAuthority.id,
 				expiresAt: expiresAt,
 			},
 		});
 
-		const consentListResponse = await prisma.consent.updateMany({
-			where: {
-				certificateId: certificateResponse.id,
-			},
-			data: [consent_list],
-		});
+		for (const consent of consent_list) {
+			const resConsent = await prisma.consent.create({
+				data: {
+					txId: consent.tx_id,
+					consentLen: consent.consent_len,
+					consentTitle: consent.consent_title,
+					consent: consent.consent,
+					certificateId: certificateResponse.id,
+					userId: userResponse.id,
+				},
+			});
+		}
 
-		console.log('Certificate data added to database:', certificateResponse);
-		console.log('Consent data added to database:', consentListResponse);
-
-		const responseBody = {
+		const responseData = {
 			rsp_code: getResponseMessage('SUCCESS').code,
 			rsp_msg: 'Electronic signature request successful, cert_tx_id has been provided.',
-			sign_ios_app_scheme_url: `mydataauth://auth?tx_id=${organizationId}`, // Replace with actual iOS scheme
-			sign_aos_app_scheme_url: `mydataauth://auth?tx_id=${organizationId}`, // Replace with actual Android scheme
-			sign_web_url: `https://mydataauth.com/auth?tx_id=${organizationId}`, // Replace with actual web URL
+			sign_ios_app_scheme_url: `mydataauth://auth?tx_id=${orgCode}`, // Replace with actual iOS scheme
+			sign_aos_app_scheme_url: `mydataauth://auth?tx_id=${orgCode}`, // Replace with actual Android scheme
+			sign_web_url: `https://mydataauth.com/auth?tx_id=${orgCode}`, // Replace with actual web URL
 			cert_tx_id: certTxId, // Transaction ID for certification
 		};
 
+		await logRequestToCsv('ca', JSON.stringify(responseData), orgCode);
+
 		// If all validations pass
-		return NextResponse.json(responseBody, { status: 200 });
+		return NextResponse.json(responseData, { status: 200 });
 	} catch (error) {
+		await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')));
 		console.error('Error in processing request:', error);
 		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
 	}

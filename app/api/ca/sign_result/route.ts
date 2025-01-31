@@ -4,6 +4,7 @@ import { getResponseMessage } from '@/constants/responseMessages';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignedConsentList } from '@/utils/signatureGenerator';
 import { PrismaClient } from '@prisma/client';
+import { initializeCsv, logRequestToCsv } from '@/utils/generateCSV';
 
 const prisma = new PrismaClient();
 
@@ -20,23 +21,20 @@ const validateAuthorizationHeader = (header: string | null): boolean => {
 };
 
 export async function POST(request: NextRequest) {
+	await initializeCsv(); // Ensure the CSV file exists
 	try {
 		// 1. Validate headers
 		const authHeader = request.headers.get('authorization');
 		const xApiTranId = request.headers.get('x-api-tran-id');
 
 		if (!validateAuthorizationHeader(authHeader)) {
-			return NextResponse.json(
-				{
-					rsp_code: '2000',
-					rsp_msg: 'Invalid or missing authorization header',
-				},
-				{ status: 401 }
-			);
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('UNAUTHORIZED')));
+			return NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
 		}
 
 		// Validate x-api-tran-id
 		if (!xApiTranId || xApiTranId.length > 25) {
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')));
 			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
 		}
 
@@ -45,15 +43,17 @@ export async function POST(request: NextRequest) {
 		const { cert_tx_id, sign_tx_id } = body;
 
 		if (!cert_tx_id || cert_tx_id.length !== 40) {
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_CERT_TX_ID')));
 			return NextResponse.json(getResponseMessage('INVALID_CERT_TX_ID'), { status: 400 });
 		}
 
 		if (!sign_tx_id || sign_tx_id.length !== 49) {
+			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')));
 			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
 		}
 
 		// 3. Fetch consent list from the database
-		const certificate = await prisma.certificate.findUnique({
+		const certificate = await prisma.certificate.findFirst({
 			where: {
 				certTxId: cert_tx_id,
 			},
@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
 				id: true,
 				signTxId: true,
 				consentList: true,
+				userId: true,
 			},
 		});
 
@@ -73,33 +74,79 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
 		}
 
-		const privateKey = process.env.CA_PRIVATE_KEY || 'certification-authority-private-key';
+		if (certificate.consentList === null) {
+			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'No consent list found' }, { status: 400 });
+		}
 
-		const signedConsentList = createSignedConsentList(certificate.consentList, privateKey);
-		console.log('Signed consent list:', signedConsentList);
+		const orgCode = sign_tx_id.split('_')[0];
+		const caCode = sign_tx_id.split('_')[1];
 
-		const updateCertificate = await prisma.signedConsent.updateMany({
+		const certificateAuthority = await prisma.certificateAuthority.findUnique({
+			where: {
+				caCode: caCode,
+			},
+		});
+
+		if (!certificateAuthority) {
+			return NextResponse.json(
+				{ rsp_code: 2000, rsp_msg: 'Invalid or missing certificate authority' },
+				{ status: 400 }
+			);
+		}
+
+		console.log('Certificate Authority:', certificateAuthority);
+
+		const consent = await prisma.consent.findMany({
 			where: {
 				certificateId: certificate.id,
 			},
-			data: [signedConsentList],
 		});
 
-		console.log('Certificate updated with signature:', updateCertificate);
+		console.log('Consent:', consent);
 
-		const successResponse = {
+		const signedConsentList = createSignedConsentList(
+			consent,
+			certificate.userId,
+			certificate.id,
+			certificateAuthority.privateKey
+		);
+		console.log('Signed consent list:', signedConsentList);
+
+		for (const signedConsent of signedConsentList) {
+			const resSignedConsent = await prisma.signedConsent.create({
+				data: signedConsent,
+			});
+
+			console.log('Certificate updated with signature:', resSignedConsent);
+		}
+
+		//format signed consent list
+		let signedConsentListFormatted = signedConsentList.map((signedConsent) => {
+			return {
+				signed_consent_len: signedConsent.signedConsentLen,
+				signed_consent: signedConsent.signedConsent,
+				tx_id: signedConsent.txId,
+				user_id: signedConsent.userId,
+				certificate_id: signedConsent.certificateId,
+			};
+		});
+
+		const responseData = {
 			rsp_code: getResponseMessage('SUCCESS').code,
 			rsp_msg: getResponseMessage('SUCCESS').message,
-			signed_consent_list: signedConsentList,
+			signed_consent_list: signedConsentListFormatted,
 		};
 
-		return NextResponse.json(successResponse, {
+		await logRequestToCsv('ca', JSON.stringify(responseData), orgCode);
+
+		return NextResponse.json(responseData, {
 			status: 200,
 			headers: {
 				'Content-Type': 'application/json; charset=UTF-8',
 			},
 		});
 	} catch (error) {
+		await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')));
 		console.error('Error processing sign result:', error);
 		return NextResponse.json(
 			{

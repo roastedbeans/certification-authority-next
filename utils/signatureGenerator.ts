@@ -5,16 +5,17 @@ import * as crypto from 'crypto';
 interface SignatureInput {
 	consent: string;
 	privateKey: string;
-	timestamp: string;
 }
 
 export function generateSignature(data: SignatureInput): string {
+	const timestamp = new Date().toISOString();
 	// Create a basic signature payload
 	const signaturePayload = {
 		type: 'SignedConsent',
 		version: '1.0',
-		sign_tx_id: data.privateKey,
-		timestamp: data.timestamp,
+		consent: data.consent,
+		timestamp,
+		privateKey: data.privateKey,
 	};
 
 	// Convert to string and encode to base64
@@ -32,21 +33,22 @@ interface Consent {
 }
 
 // Helper function to create signed array of consent list
-export function createSignedConsentList(consentList: Consent[], privateKey: string) {
+export function createSignedConsentList(consentList: any, userId: string, certId: string, privateKey: string) {
 	const signedConsentList = [];
-	const timestamp = new Date().toISOString();
+	console.log(privateKey);
 
 	for (const consent of consentList) {
 		const signedConsent = generateSignature({
 			consent: consent.consent,
-			privateKey: privateKey,
-			timestamp,
+			privateKey,
 		});
 
 		signedConsentList.push({
-			signed_consent_len: signedConsent.length,
-			signed_consent: signedConsent,
-			tx_id: consent.txId,
+			signedConsentLen: signedConsent.length,
+			signedConsent: signedConsent,
+			txId: consent.txId,
+			userId,
+			certificateId: certId,
 		});
 	}
 
