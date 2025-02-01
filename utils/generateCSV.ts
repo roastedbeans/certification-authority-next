@@ -19,6 +19,7 @@ export const initializeCsv = async () => {
 				{ id: 'ast_id', title: 'ast_id' },
 				{ id: 'scope', title: 'scope' },
 				{ id: 'res_data', title: 'res_data' },
+				{ id: 'req_data', title: 'req_data' },
 			],
 		});
 
@@ -46,7 +47,7 @@ const getLastSeqNo = async (): Promise<number> => {
 };
 
 // Append a new request to the CSV file
-export const logRequestToCsv = async (scope: string, res_data: string, orgCode?: string) => {
+export const logRequestToCsv = async (scope: string, orgCode: string, req_data: string, res_data: string) => {
 	await initializeCsv(); // Ensure the CSV file exists
 
 	// Get the last seq_no and increment it
@@ -58,13 +59,15 @@ export const logRequestToCsv = async (scope: string, res_data: string, orgCode?:
 		seq_no: seqNo,
 		busr: faker.string.alphanumeric(10),
 		api_id: faker.string.alphanumeric(10),
-		org_code: orgCode as string,
+		org_code: orgCode,
 		own_org_code: process.env.CA_CODE as string,
 		ast_id: faker.string.alphanumeric(10),
 		scope: scope,
 		res_data: res_data,
+		req_data: req_data,
 	};
 
+	console.log('Request data:', requestData);
 	// Append the new request data to the CSV file
 	const csvWriter = createCsvWriter({
 		path: csvFilePath,
@@ -77,6 +80,7 @@ export const logRequestToCsv = async (scope: string, res_data: string, orgCode?:
 			{ id: 'ast_id', title: 'ast_id' },
 			{ id: 'scope', title: 'scope' },
 			{ id: 'res_data', title: 'res_data' },
+			{ id: 'req_data', title: 'req_data' },
 		],
 		append: true, // Append to the existing file
 	});

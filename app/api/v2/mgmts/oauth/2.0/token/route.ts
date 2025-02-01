@@ -16,7 +16,12 @@ export async function POST(req: Request) {
 		const headers = req.headers;
 		const xApiTranId = headers.get('x-api-tran-id');
 		if (!xApiTranId || xApiTranId.length > 25) {
-			await logRequestToCsv('manage', JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')));
+			await logRequestToCsv(
+				'ca',
+				'unknown',
+				JSON.stringify({ req_header: req.headers, req_body: req.body }),
+				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID'))
+			);
 			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
 		}
 
@@ -29,7 +34,12 @@ export async function POST(req: Request) {
 
 		// Validate body parameters
 		if ((grantType as string) !== 'client_credential' || !clientId || !clientSecret || (scope as string) !== 'manage') {
-			await logRequestToCsv('manage', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logRequestToCsv(
+				'ca',
+				'unknown',
+				JSON.stringify({ req_header: req.headers, req_body: req.body }),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS'))
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
@@ -39,7 +49,12 @@ export async function POST(req: Request) {
 		});
 
 		if (!client || client.clientSecret !== (clientSecret as string)) {
-			await logRequestToCsv('manage', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logRequestToCsv(
+				'ca',
+				'unknown',
+				JSON.stringify({ req_header: req.headers, req_body: req.body }),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS'))
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 401 });
 		}
 
@@ -58,11 +73,21 @@ export async function POST(req: Request) {
 			timestamp: timestamp(new Date()),
 		};
 
-		await logRequestToCsv('manage', JSON.stringify(responseData), orgCode);
+		await logRequestToCsv(
+			'ca',
+			orgCode,
+			JSON.stringify({ req_header: req.headers, req_body: req.body }),
+			JSON.stringify(responseData)
+		);
 
 		return NextResponse.json(responseData, { status: 200 });
 	} catch (error) {
-		await logRequestToCsv('manage', JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')));
+		await logRequestToCsv(
+			'ca',
+			'unknown',
+			JSON.stringify({ req_header: req.headers, req_body: req.body }),
+			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR'))
+		);
 		console.error('Error in token generation:', error);
 		return NextResponse.json(getResponseMessage('INTERNAL_SERVER_ERROR'), { status: 500 });
 	} finally {

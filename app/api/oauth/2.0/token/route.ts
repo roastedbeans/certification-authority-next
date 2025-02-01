@@ -16,7 +16,12 @@ export async function POST(req: Request) {
 		const xApiTranId = headers.get('x-api-tran-id');
 
 		if (!xApiTranId || xApiTranId.length > 25) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')));
+			await logRequestToCsv(
+				'ca',
+				'unknown',
+				JSON.stringify({ req_header: req.headers, req_body: req.body }),
+				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID'))
+			);
 			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
 		}
 
@@ -29,7 +34,12 @@ export async function POST(req: Request) {
 
 		// Validate body parameters
 		if (grant_type !== 'client_credential' || !client_id || !client_secret || scope !== 'ca') {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logRequestToCsv(
+				'ca',
+				'unknown',
+				JSON.stringify({ req_header: req.headers, req_body: req.body }),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS'))
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
@@ -44,7 +54,12 @@ export async function POST(req: Request) {
 		const clientSecret = oAuthClientRes?.clientSecret;
 
 		if (!clientSecret || clientSecret !== client_secret) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logRequestToCsv(
+				'ca',
+				'unknown',
+				JSON.stringify({ req_header: req.headers, req_body: req.body }),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS'))
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 401 });
 		}
 
@@ -62,11 +77,16 @@ export async function POST(req: Request) {
 
 		const orgCode = client_id.toString().split('-')[0];
 
-		await logRequestToCsv('ca', JSON.stringify(responseData), orgCode);
+		await logRequestToCsv('ca', orgCode, JSON.stringify(req.headers), JSON.stringify(responseData));
 
 		return NextResponse.json(responseData, { status: 200 });
 	} catch (error) {
-		await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')));
+		await logRequestToCsv(
+			'ca',
+			'unknown',
+			JSON.stringify({ req_header: req.headers, req_body: req.body }),
+			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR'))
+		);
 		console.error('Error in token generation:', error);
 		return NextResponse.json(getResponseMessage('INTERNAL_SERVER_ERROR'), { status: 500 });
 	} finally {
