@@ -46,7 +46,12 @@ const getLastSeqNo = async (): Promise<number> => {
 };
 
 // Append a new request to the CSV file
-export const logRequestToCsv = async (scope: string, res_data: string, orgCode?: string) => {
+export const logRequestToCsv = async (
+	request: string,
+	requestBody: string,
+	responseBody: string,
+	responseStatusCode: string
+) => {
 	await initializeCsv(); // Ensure the CSV file exists
 
 	// Get the last seq_no and increment it
