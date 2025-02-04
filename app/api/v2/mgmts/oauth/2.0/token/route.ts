@@ -3,22 +3,16 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { getResponseMessage } from '@/constants/responseMessages';
 import { timestamp } from '@/utils/formatTimestamp';
-import { initializeCsv, logRequestToCsv } from '@/utils/generateCSV';
+import { logger } from '@/utils/generateCSV';
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secure-secret'; // Replace with your secure environment variable
 
 export async function POST(req: Request) {
-	await initializeCsv(); // Ensure the CSV file exists
-
 	try {
 		// Parse and validate headers
 		const headers = req.headers;
 		const xApiTranId = headers.get('x-api-tran-id');
-		if (!xApiTranId || xApiTranId.length > 25) {
-			await logRequestToCsv('manage', JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')));
-			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
-		}
 
 		// Parse body
 		const body = await req.formData();
@@ -27,9 +21,24 @@ export async function POST(req: Request) {
 		const clientSecret = body.get('client_secret');
 		const scope = body.get('scope');
 
+		if (!xApiTranId || xApiTranId.length > 25) {
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')),
+				'401'
+			);
+			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
+		}
+
 		// Validate body parameters
 		if ((grantType as string) !== 'client_credential' || !clientId || !clientSecret || (scope as string) !== 'manage') {
-			await logRequestToCsv('manage', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'401'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
@@ -39,7 +48,12 @@ export async function POST(req: Request) {
 		});
 
 		if (!client || client.clientSecret !== (clientSecret as string)) {
-			await logRequestToCsv('manage', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'401'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 401 });
 		}
 
@@ -58,11 +72,16 @@ export async function POST(req: Request) {
 			timestamp: timestamp(new Date()),
 		};
 
-		await logRequestToCsv('manage', JSON.stringify(responseData), orgCode);
+		await logger(JSON.stringify(req), JSON.stringify(body), JSON.stringify(responseData), '200');
 
 		return NextResponse.json(responseData, { status: 200 });
 	} catch (error) {
-		await logRequestToCsv('manage', JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')));
+		await logger(
+			JSON.stringify(req),
+			JSON.stringify(error),
+			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')),
+			'500'
+		);
 		console.error('Error in token generation:', error);
 		return NextResponse.json(getResponseMessage('INTERNAL_SERVER_ERROR'), { status: 500 });
 	} finally {

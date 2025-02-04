@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { getResponseMessage } from '@/constants/responseMessages';
 import { generateCertTxId } from '@/utils/signatureGenerator';
 import { PrismaClient } from '@prisma/client';
-import { initializeCsv, logRequestToCsv } from '@/utils/generateCSV';
+import { logger } from '@/utils/generateCSV';
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secure-secret';
@@ -16,33 +16,10 @@ type Consent = {
 };
 
 export async function POST(req: Request) {
-	await initializeCsv(); // Ensure the CSV file exists
 	try {
 		const headers = req.headers;
 		const authorization = headers.get('Authorization');
 		const xApiTranId = headers.get('x-api-tran-id'); // e.g. 1234567890123456789012345
-
-		if (!authorization || !authorization.startsWith('Bearer ')) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('UNAUTHORIZED')));
-			return NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
-		}
-
-		// Extract the token
-		const token = authorization.split(' ')[1];
-		let decodedToken;
-
-		try {
-			decodedToken = jwt.verify(token, JWT_SECRET);
-		} catch (error) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_TOKEN')));
-			return NextResponse.json(getResponseMessage('INVALID_TOKEN'), { status: 403 });
-		}
-
-		// Validate x-api-tran-id
-		if (!xApiTranId || xApiTranId.length > 25) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')));
-			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
-		}
 
 		// Validate request body
 		const body = await req.json();
@@ -64,58 +41,150 @@ export async function POST(req: Request) {
 			// --tx_id MD1234567890_0987654321_1234567890_20250117120000_E349RU3IDKFJ
 		} = body;
 
+		if (!authorization || !authorization.startsWith('Bearer ')) {
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('UNAUTHORIZED')),
+				'401'
+			);
+			return NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
+		}
+
+		// Extract the token
+		const token = authorization.split(' ')[1];
+		let decodedToken;
+
+		try {
+			decodedToken = jwt.verify(token, JWT_SECRET);
+		} catch (error) {
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_TOKEN')),
+				'403'
+			);
+			return NextResponse.json(getResponseMessage('INVALID_TOKEN'), { status: 403 });
+		}
+
+		// Validate x-api-tran-id
+		if (!xApiTranId || xApiTranId.length > 25) {
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')),
+				'400'
+			);
+			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
+		}
+
 		if (!sign_tx_id || sign_tx_id.length > 49) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
 		}
 
 		if (!user_ci || user_ci.length > 100) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!real_name || real_name.length > 30) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!phone_num || phone_num.length > 15) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!request_title || request_title.length > 200) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!device_code || device_code.length > 50) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!device_browser || device_browser.length > 50) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!return_app_scheme_url || return_app_scheme_url.length > 200) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!consent_cnt || typeof consent_cnt !== 'number') {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!consent_list || (consent_list as Consent[]).length !== consent_cnt) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		if (!consent_type || consent_type.length > 1) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
@@ -211,12 +280,19 @@ export async function POST(req: Request) {
 			cert_tx_id: certTxId, // Transaction ID for certification
 		};
 
-		await logRequestToCsv('ca', JSON.stringify(responseData), orgCode);
+		await logger(JSON.stringify(req), JSON.stringify(body), JSON.stringify(responseData), '200');
 
 		// If all validations pass
 		return NextResponse.json(responseData, { status: 200 });
 	} catch (error) {
-		await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')));
+		const body = await req.formData();
+		await logger(
+			JSON.stringify(req),
+			JSON.stringify(body),
+			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')),
+			'500'
+		);
+
 		console.error('Error in processing request:', error);
 		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
 	}

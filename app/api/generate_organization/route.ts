@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
-	await initializeCsv(); // Ensure the CSV file exists
 	const body = await request.json();
 
 	const { org_code, name, op_type, org_type, auth_type, industry } = body;

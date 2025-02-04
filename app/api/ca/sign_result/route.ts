@@ -4,11 +4,9 @@ import { getResponseMessage } from '@/constants/responseMessages';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignedConsentList } from '@/utils/signatureGenerator';
 import { PrismaClient } from '@prisma/client';
-import { initializeCsv, logRequestToCsv } from '@/utils/generateCSV';
+import { logger } from '@/utils/generateCSV';
 
 const prisma = new PrismaClient();
-
-// Types for the request body
 interface SignResultRequestBody {
 	cert_tx_id: string; // Certificate Authority Transaction ID
 	sign_tx_id: string; // Signature Request Transaction ID
@@ -20,35 +18,54 @@ const validateAuthorizationHeader = (header: string | null): boolean => {
 	return type === 'Bearer' && !!token;
 };
 
-export async function POST(request: NextRequest) {
-	await initializeCsv(); // Ensure the CSV file exists
+export async function POST(req: NextRequest) {
 	try {
 		// 1. Validate headers
-		const authHeader = request.headers.get('authorization');
-		const xApiTranId = request.headers.get('x-api-tran-id');
+		const authHeader = req.headers.get('authorization');
+		const xApiTranId = req.headers.get('x-api-tran-id');
+
+		// 2. Parse and validate body
+		const body: SignResultRequestBody = await req.json();
+		const { cert_tx_id, sign_tx_id } = body;
 
 		if (!validateAuthorizationHeader(authHeader)) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('UNAUTHORIZED')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('UNAUTHORIZED')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
 		}
 
 		// Validate x-api-tran-id
 		if (!xApiTranId || xApiTranId.length > 25) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
 		}
 
-		// 2. Parse and validate body
-		const body: SignResultRequestBody = await request.json();
-		const { cert_tx_id, sign_tx_id } = body;
-
 		if (!cert_tx_id || cert_tx_id.length !== 40) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_CERT_TX_ID')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_CERT_TX_ID')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_CERT_TX_ID'), { status: 400 });
 		}
 
 		if (!sign_tx_id || sign_tx_id.length !== 49) {
-			await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')));
+			await logger(
+				JSON.stringify(req),
+				JSON.stringify(body),
+				JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')),
+				'400'
+			);
 			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
 		}
 
@@ -94,15 +111,11 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		console.log('Certificate Authority:', certificateAuthority);
-
 		const consent = await prisma.consent.findMany({
 			where: {
 				certificateId: certificate.id,
 			},
 		});
-
-		console.log('Consent:', consent);
 
 		const signedConsentList = createSignedConsentList(
 			consent,
@@ -110,14 +123,11 @@ export async function POST(request: NextRequest) {
 			certificate.id,
 			certificateAuthority.privateKey
 		);
-		console.log('Signed consent list:', signedConsentList);
 
 		for (const signedConsent of signedConsentList) {
-			const resSignedConsent = await prisma.signedConsent.create({
+			await prisma.signedConsent.create({
 				data: signedConsent,
 			});
-
-			console.log('Certificate updated with signature:', resSignedConsent);
 		}
 
 		//format signed consent list
@@ -137,7 +147,7 @@ export async function POST(request: NextRequest) {
 			signed_consent_list: signedConsentListFormatted,
 		};
 
-		await logRequestToCsv('ca', JSON.stringify(responseData), orgCode);
+		await logger(JSON.stringify(req), JSON.stringify(body), JSON.stringify(responseData), '200');
 
 		return NextResponse.json(responseData, {
 			status: 200,
@@ -146,7 +156,13 @@ export async function POST(request: NextRequest) {
 			},
 		});
 	} catch (error) {
-		await logRequestToCsv('ca', JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')));
+		const body = await req.json();
+		await logger(
+			JSON.stringify(req),
+			JSON.stringify(body),
+			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')),
+			'500'
+		);
 		console.error('Error processing sign result:', error);
 		return NextResponse.json(
 			{

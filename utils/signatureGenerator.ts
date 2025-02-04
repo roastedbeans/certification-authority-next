@@ -35,7 +35,6 @@ interface Consent {
 // Helper function to create signed array of consent list
 export function createSignedConsentList(consentList: any, userId: string, certId: string, privateKey: string) {
 	const signedConsentList = [];
-	console.log(privateKey);
 
 	for (const consent of consentList) {
 		const signedConsent = generateSignature({

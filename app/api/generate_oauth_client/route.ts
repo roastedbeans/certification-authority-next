@@ -23,8 +23,6 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
 		}
 
-		console.log('organization:', organization);
-
 		const response = await prisma.oAuthClient.create({
 			data: {
 				organizationId: organization.id,
@@ -32,8 +30,6 @@ export async function POST(request: NextRequest) {
 				clientSecret: clientSecret,
 			},
 		});
-
-		console.log('response:', response);
 
 		return NextResponse.json(response);
 	} catch (error) {
