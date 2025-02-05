@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { getResponseMessage } from '@/constants/responseMessages';
@@ -8,25 +8,38 @@ import { logger } from '@/utils/generateCSV';
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secure-secret'; // Replace with your secure environment variable
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+	const headers = req.headers;
+	const headersList = Object.fromEntries(headers.entries());
+	const authorization = headers.get('Authorization');
+	const xApiTranId = headers.get('x-api-tran-id');
+	const method = req.method;
+	const url = req.nextUrl.toString();
+	const query = Object.fromEntries(req.nextUrl.searchParams);
+
+	const reqBody = await req.formData();
+	const body = Object.fromEntries(reqBody);
+	const grantType = reqBody.get('grant_type');
+	const clientId = reqBody.get('client_id');
+	const clientSecret = reqBody.get('client_secret');
+	const scope = reqBody.get('scope');
+
+	console.log('body:', clientId);
+
+	const request = {
+		method,
+		url,
+		query,
+		headers: headersList,
+	};
+
 	try {
-		// Parse and validate headers
-		const headers = req.headers;
-		const xApiTranId = headers.get('x-api-tran-id');
-
-		// Parse body
-		const body = await req.formData();
-		const grantType = body.get('grant_type');
-		const clientId = body.get('client_id');
-		const clientSecret = body.get('client_secret');
-		const scope = body.get('scope');
-
 		if (!xApiTranId || xApiTranId.length > 25) {
 			await logger(
-				JSON.stringify(req),
+				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')),
-				'401'
+				'400'
 			);
 			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
 		}
@@ -34,10 +47,10 @@ export async function POST(req: Request) {
 		// Validate body parameters
 		if ((grantType as string) !== 'client_credential' || !clientId || !clientSecret || (scope as string) !== 'manage') {
 			await logger(
-				JSON.stringify(req),
+				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
-				'401'
+				'400'
 			);
 			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
@@ -49,12 +62,12 @@ export async function POST(req: Request) {
 
 		if (!client || client.clientSecret !== (clientSecret as string)) {
 			await logger(
-				JSON.stringify(req),
+				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'401'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 401 });
+			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 		}
 
 		const orgCode = client.clientId.split('-')[0];
@@ -72,12 +85,12 @@ export async function POST(req: Request) {
 			timestamp: timestamp(new Date()),
 		};
 
-		await logger(JSON.stringify(req), JSON.stringify(body), JSON.stringify(responseData), '200');
+		await logger(JSON.stringify(request), JSON.stringify(body), JSON.stringify(responseData), '200');
 
 		return NextResponse.json(responseData, { status: 200 });
 	} catch (error) {
 		await logger(
-			JSON.stringify(req),
+			JSON.stringify(request),
 			JSON.stringify(error),
 			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')),
 			'500'

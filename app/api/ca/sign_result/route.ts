@@ -7,10 +7,6 @@ import { PrismaClient } from '@prisma/client';
 import { logger } from '@/utils/generateCSV';
 
 const prisma = new PrismaClient();
-interface SignResultRequestBody {
-	cert_tx_id: string; // Certificate Authority Transaction ID
-	sign_tx_id: string; // Signature Request Transaction ID
-}
 
 const validateAuthorizationHeader = (header: string | null): boolean => {
 	if (!header) return false;
@@ -19,18 +15,28 @@ const validateAuthorizationHeader = (header: string | null): boolean => {
 };
 
 export async function POST(req: NextRequest) {
+	const headers = req.headers;
+	const headersList = Object.fromEntries(headers.entries());
+	const authorization = headers.get('Authorization');
+	const xApiTranId = headers.get('x-api-tran-id');
+	const method = req.method;
+	const url = req.nextUrl.toString();
+	const query = Object.fromEntries(req.nextUrl.searchParams);
+	const body = await req.json();
+
+	const { cert_tx_id, sign_tx_id } = body;
+
+	const request = {
+		method,
+		url,
+		query,
+		headers: headersList,
+	};
+
 	try {
-		// 1. Validate headers
-		const authHeader = req.headers.get('authorization');
-		const xApiTranId = req.headers.get('x-api-tran-id');
-
-		// 2. Parse and validate body
-		const body: SignResultRequestBody = await req.json();
-		const { cert_tx_id, sign_tx_id } = body;
-
-		if (!validateAuthorizationHeader(authHeader)) {
+		if (!validateAuthorizationHeader(authorization)) {
 			await logger(
-				JSON.stringify(req),
+				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('UNAUTHORIZED')),
 				'400'
@@ -41,7 +47,7 @@ export async function POST(req: NextRequest) {
 		// Validate x-api-tran-id
 		if (!xApiTranId || xApiTranId.length > 25) {
 			await logger(
-				JSON.stringify(req),
+				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')),
 				'400'
@@ -51,7 +57,7 @@ export async function POST(req: NextRequest) {
 
 		if (!cert_tx_id || cert_tx_id.length !== 40) {
 			await logger(
-				JSON.stringify(req),
+				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_CERT_TX_ID')),
 				'400'
@@ -61,7 +67,7 @@ export async function POST(req: NextRequest) {
 
 		if (!sign_tx_id || sign_tx_id.length !== 49) {
 			await logger(
-				JSON.stringify(req),
+				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')),
 				'400'
@@ -147,7 +153,7 @@ export async function POST(req: NextRequest) {
 			signed_consent_list: signedConsentListFormatted,
 		};
 
-		await logger(JSON.stringify(req), JSON.stringify(body), JSON.stringify(responseData), '200');
+		await logger(JSON.stringify(request), JSON.stringify(body), JSON.stringify(responseData), '200');
 
 		return NextResponse.json(responseData, {
 			status: 200,
@@ -156,9 +162,8 @@ export async function POST(req: NextRequest) {
 			},
 		});
 	} catch (error) {
-		const body = await req.json();
 		await logger(
-			JSON.stringify(req),
+			JSON.stringify(request),
 			JSON.stringify(body),
 			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')),
 			'500'

@@ -2,13 +2,13 @@ import { createObjectCsvWriter as createCsvWriter } from 'csv-writer';
 import fs from 'fs';
 import path from 'path';
 
-const csvFilePath = path.resolve(`./api_log_${process.env.CA_CODE}.csv`);
+const csvFilePath = path.resolve(`./attack_api_log_certification_authority.csv`);
 
 // Define CSV headers
 const csvHeaders = [
 	{ id: 'request_url', title: 'request.url' },
 	{ id: 'request_method', title: 'request.method' },
-	{ id: 'request_authorization', title: 'request.header.Authorization' },
+	{ id: 'request_authorization', title: 'request.header.authorization' },
 	{ id: 'request_api_tran_id', title: 'request.header.x-api-tran-id' },
 	{ id: 'request_api_type', title: 'request.header.x-api-type' },
 	{ id: 'request_cookie', title: 'request.headers.cookie' },
@@ -37,8 +37,7 @@ export const logger = async (
 	responseStatusCode: string
 ) => {
 	await initializeCsv(); // Ensure the CSV file exists
-	const parsedRequest = JSON.parse(request);
-	console.log('parsed:', parsedRequest);
+	const req = JSON.parse(request);
 
 	const csvWriter = createCsvWriter({
 		path: csvFilePath,
@@ -48,13 +47,13 @@ export const logger = async (
 
 	await csvWriter.writeRecords([
 		{
-			request_url: parsedRequest?.url || '',
-			request_method: parsedRequest?.method || '',
-			request_authorization: parsedRequest?.headers?.Authorization || '',
-			request_api_tran_id: parsedRequest?.headers?.['x-api-tran-id'] || '',
-			request_api_type: parsedRequest?.headers?.['x-api-type'] || '',
-			request_cookie: parsedRequest?.headers?.cookie || '',
-			request_content_length: parsedRequest?.headers?.['content-length'] || '',
+			request_url: req?.url || '',
+			request_method: req?.method || '',
+			request_authorization: req?.headers?.authorization || '',
+			request_api_tran_id: req?.headers?.['x-api-tran-id'] || '',
+			request_api_type: req?.headers?.['x-api-type'] || '',
+			request_cookie: req?.headers?.cookie || '',
+			request_content_length: req?.headers?.['content-length'] || '',
 			request_body: JSON.stringify(requestBody),
 			response_body: JSON.stringify(responseBody),
 			response_status: responseStatusCode,
