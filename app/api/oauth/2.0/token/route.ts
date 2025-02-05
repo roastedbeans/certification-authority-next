@@ -73,6 +73,8 @@ export async function POST(req: Request) {
 			scope: scope,
 		};
 
+		console.log('reqdatahere2:', await req.json());
+
 		await logger(JSON.stringify(req), JSON.stringify(body), JSON.stringify(responseData), '200');
 
 		return NextResponse.json(responseData, { status: 200 });

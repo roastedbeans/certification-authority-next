@@ -38,6 +38,7 @@ export const logger = async (
 ) => {
 	await initializeCsv(); // Ensure the CSV file exists
 	const parsedRequest = JSON.parse(request);
+	console.log('parsed:', parsedRequest);
 
 	const csvWriter = createCsvWriter({
 		path: csvFilePath,
@@ -47,13 +48,13 @@ export const logger = async (
 
 	await csvWriter.writeRecords([
 		{
-			request_url: parsedRequest.url,
-			request_method: parsedRequest.method,
-			request_authorization: parsedRequest.headers.authorization || '',
-			request_api_tran_id: parsedRequest.headers['x-api-tran-id'] || '',
-			request_api_type: parsedRequest.headers['x-api-type'] || '',
-			request_cookie: parsedRequest.headers.cookie || '',
-			request_content_length: parsedRequest.headers['content-length'] || '',
+			request_url: parsedRequest?.url || '',
+			request_method: parsedRequest?.method || '',
+			request_authorization: parsedRequest?.headers?.Authorization || '',
+			request_api_tran_id: parsedRequest?.headers?.['x-api-tran-id'] || '',
+			request_api_type: parsedRequest?.headers?.['x-api-type'] || '',
+			request_cookie: parsedRequest?.headers?.cookie || '',
+			request_content_length: parsedRequest?.headers?.['content-length'] || '',
 			request_body: JSON.stringify(requestBody),
 			response_body: JSON.stringify(responseBody),
 			response_status: responseStatusCode,
