@@ -9,7 +9,8 @@
 		"start": "next start",
 		"lint": "next lint",
 		"seedCA": "ts-node scripts/seedCA.ts",
-		"seedOrg": "ts-node scripts/seedOrg.ts"
+		"seedOrg": "ts-node scripts/seedOrg.ts",
+		"log": "ts-node scripts/logWatcher.ts"
 	},
 	"dependencies": {
 		"@faker-js/faker": "^9.4.0",

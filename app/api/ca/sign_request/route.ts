@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 	try {
 		if (!authorization?.startsWith('Bearer ')) {
 			await logger(
-				JSON.stringify(req),
+				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('UNAUTHORIZED')),
 				'401'
@@ -224,14 +224,9 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		if (!accountExist) {
-			//error
-			return NextResponse.json({ error: `Account ${firstName + ' ' + lastName} does not exist` }, { status: 400 });
-		}
-
 		const account = await prisma.account.update({
 			where: {
-				accountNum: accountExist.accountNum,
+				accountNum: accountExist?.accountNum,
 			},
 			data: {
 				userId: userResponse.id,
@@ -243,13 +238,6 @@ export async function POST(req: NextRequest) {
 				caCode: caCode,
 			},
 		});
-
-		if (!certificateAuthority) {
-			return NextResponse.json(
-				{ rsp_code: 2000, rsp_msg: 'Invalid or missing certificate authority' },
-				{ status: 400 }
-			);
-		}
 
 		const certificateResponse = await prisma.certificate.create({
 			data: {
@@ -263,7 +251,7 @@ export async function POST(req: NextRequest) {
 				consentType: consent_type,
 				deviceCode: device_code,
 				deviceBrowser: device_browser,
-				certificateAuthorityId: certificateAuthority.id,
+				certificateAuthorityId: certificateAuthority?.id || '',
 				expiresAt: expiresAt,
 			},
 		});
@@ -290,7 +278,7 @@ export async function POST(req: NextRequest) {
 			cert_tx_id: certTxId, // Transaction ID for certification
 		};
 
-		await logger(JSON.stringify(req), JSON.stringify(body), JSON.stringify(responseData), '200');
+		await logger(JSON.stringify(request), JSON.stringify(body), JSON.stringify(responseData), '200');
 
 		// If all validations pass
 		return NextResponse.json(responseData, { status: 200 });

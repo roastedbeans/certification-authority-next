@@ -88,19 +88,6 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		if (!certificate) {
-			return NextResponse.json(getResponseMessage('NO_CERTIFICATE_FOUND'), { status: 404 });
-		}
-
-		// 4. Check if sign_tx_id matches the certificate sign_tx_id
-		if (certificate.signTxId !== sign_tx_id) {
-			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
-		}
-
-		if (certificate.consentList === null) {
-			return NextResponse.json({ rsp_code: 2000, rsp_msg: 'No consent list found' }, { status: 400 });
-		}
-
 		const orgCode = sign_tx_id.split('_')[0];
 		const caCode = sign_tx_id.split('_')[1];
 
@@ -110,24 +97,17 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		if (!certificateAuthority) {
-			return NextResponse.json(
-				{ rsp_code: 2000, rsp_msg: 'Invalid or missing certificate authority' },
-				{ status: 400 }
-			);
-		}
-
 		const consent = await prisma.consent.findMany({
 			where: {
-				certificateId: certificate.id,
+				certificateId: certificate?.id,
 			},
 		});
 
 		const signedConsentList = createSignedConsentList(
 			consent,
-			certificate.userId,
-			certificate.id,
-			certificateAuthority.privateKey
+			certificate?.userId || '',
+			certificate?.id || '',
+			certificateAuthority?.privateKey || ''
 		);
 
 		for (const signedConsent of signedConsentList) {

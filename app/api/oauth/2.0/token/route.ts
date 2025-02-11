@@ -14,6 +14,17 @@ interface RequestBody {
 	scope: string;
 }
 
+// API Gateway
+
+// a request is sent -> attack detection module https:attackfinder.com/api/detectattack -> certification authority
+
+const SignatureDetection = (request: any) => {
+	// signature code
+	// return boolean
+
+	return true;
+};
+
 export async function POST(req: NextRequest) {
 	const headers = req.headers;
 	const headersList = Object.fromEntries(headers.entries());
