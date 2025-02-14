@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		// Validate x-api-tran-id
-		if (!xApiTranId || xApiTranId.length > 25) {
+		if (!xApiTranId) {
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),

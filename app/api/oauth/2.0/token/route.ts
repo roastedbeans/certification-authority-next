@@ -18,13 +18,6 @@ interface RequestBody {
 
 // a request is sent -> attack detection module https:attackfinder.com/api/detectattack -> certification authority
 
-const SignatureDetection = (request: any) => {
-	// signature code
-	// return boolean
-
-	return true;
-};
-
 export async function POST(req: NextRequest) {
 	const headers = req.headers;
 	const headersList = Object.fromEntries(headers.entries());
@@ -45,7 +38,7 @@ export async function POST(req: NextRequest) {
 	};
 
 	try {
-		if (!xApiTranId || xApiTranId.length > 25) {
+		if (!xApiTranId) {
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
@@ -56,7 +49,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		// Validate body parameters
-		if (body.grant_type !== 'client_credential' || !body.client_id || !body.client_secret || body.scope !== 'ca') {
+		if (body.grant_type !== 'client_credentials' || !body.client_id || !body.client_secret || body.scope !== 'ca') {
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),

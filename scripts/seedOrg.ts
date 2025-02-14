@@ -7,20 +7,20 @@ async function main() {
 		data: {
 			name: 'Anya Bank',
 			opType: 'I',
-			orgCode: 'ORG2025001',
+			orgCode: 'anya123456',
 			orgType: '01',
 			authType: '01',
 			industry: 'bank',
-			serialNum: 'BOAB20240201', // Add serialNum as required by the schema
+			serialNum: 'aynaserial00', // Add serialNum as required by the schema
 		},
 	});
 
 	console.log('Anya Bank created:', bankAnya);
 
 	const bodyOauthAnyaClient = {
-		orgCode: 'ORG2025001',
-		clientId: 'ORG2025001-CLIENT-ID',
-		clientSecret: 'ORG2025001-CLIENT-SECRET',
+		orgCode: 'anya123456',
+		clientId: 'anya123456clientid',
+		clientSecret: 'anya123456clientsecret',
 	};
 
 	const optionOauthAnyaClient = {
@@ -38,20 +38,20 @@ async function main() {
 		data: {
 			name: 'Bond Bank',
 			opType: 'I',
-			orgCode: 'ORG2025002',
+			orgCode: 'bond123456',
 			orgType: '01',
 			authType: '01',
 			industry: 'bank',
-			serialNum: 'BOBB20240202', // Add serialNum as required by the schema
+			serialNum: 'bondserial00', // Add serialNum as required by the schema
 		},
 	});
 
 	console.log('Bond Bank created:', bankBond);
 
 	const bodyOauthBondClient = {
-		orgCode: 'ORG2025002',
-		clientId: 'ORG2025002-CLIENT-ID',
-		clientSecret: 'ORG2025002-CLIENT-SECRET',
+		orgCode: 'bond123456',
+		clientId: 'bond123456clientid',
+		clientSecret: 'bond123456clientsecret',
 	};
 
 	const optionOauthBondClient = {

@@ -24,8 +24,6 @@ export async function POST(req: NextRequest) {
 	const clientSecret = reqBody.get('client_secret');
 	const scope = reqBody.get('scope');
 
-	console.log('body:', clientId);
-
 	const request = {
 		method,
 		url,
@@ -34,7 +32,7 @@ export async function POST(req: NextRequest) {
 	};
 
 	try {
-		if (!xApiTranId || xApiTranId.length > 25) {
+		if (!xApiTranId) {
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
@@ -45,7 +43,12 @@ export async function POST(req: NextRequest) {
 		}
 
 		// Validate body parameters
-		if ((grantType as string) !== 'client_credential' || !clientId || !clientSecret || (scope as string) !== 'manage') {
+		if (
+			(grantType as string) !== 'client_credentials' ||
+			!clientId ||
+			!clientSecret ||
+			(scope as string) !== 'manage'
+		) {
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),

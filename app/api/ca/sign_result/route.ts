@@ -130,6 +130,7 @@ export async function POST(req: NextRequest) {
 		const responseData = {
 			rsp_code: getResponseMessage('SUCCESS').code,
 			rsp_msg: getResponseMessage('SUCCESS').message,
+			signed_consent_cnt: signedConsentList.length,
 			signed_consent_list: signedConsentListFormatted,
 		};
 
