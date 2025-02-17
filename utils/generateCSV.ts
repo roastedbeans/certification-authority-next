@@ -3,7 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { generateTxtFile } from './generateLog';
 
-const csvFilePath = path.resolve(`./ca_formatted_logs.csv`);
+const filePath = path.join(process.cwd(), '/public/requests_responses.txt');
+const csvFIlePath = path.join(process.cwd(), '/public/ca_formatted_logs.csv');
+const csvFilePath = path.resolve(csvFIlePath);
 // Define CSV headers
 const csvHeaders = [
 	{ id: 'attack_type', title: 'attack.type' },
@@ -74,7 +76,10 @@ export const logger = async (
 	const stringRequestContent = JSON.stringify(requestContent);
 	const stringResponseContent = JSON.stringify(responseContent);
 
-	generateTxtFile('./requests_responses.txt', { request: stringRequestContent, response: stringResponseContent });
+	generateTxtFile(filePath, {
+		request: stringRequestContent,
+		response: stringResponseContent,
+	});
 
 	await csvWriter.writeRecords([
 		{

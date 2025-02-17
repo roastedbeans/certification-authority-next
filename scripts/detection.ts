@@ -509,6 +509,8 @@ export function specificationBasedDetection(entry: LogEntry): boolean {
 		return false;
 	}
 
+	console.log(entry.request);
+
 	try {
 		// Validate request
 		spec.request.parse({

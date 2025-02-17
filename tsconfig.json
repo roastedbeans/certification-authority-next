@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"lib": ["dom", "dom.iterable", "esnext"],
 		"allowJs": true,
-		"skipLibCheck": true,
+		"skipLibCheck": true, // what is this? https://stackoverflow.com/questions/61940267/what-does-skiplibcheck-do-in-tsconfig-json
 		"strict": true,
 		"noEmit": true,
 		"esModuleInterop": true,
