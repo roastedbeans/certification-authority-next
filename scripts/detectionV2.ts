@@ -94,6 +94,9 @@ const securityPatterns = {
 		// HTML breaking refined
 		// /<[^\w<>]*(?:[^<>"'\s]*:)?[^\w<>]*(?:\W*s\W*c\W*r\W*i\W*p\W*t|form|style|\w+:\w+)/i,
 		/<img\s+[^>]*onerror\s*=\s*["'][^"']*["'][^>]*>/gi,
+
+		// <script>alert(document.cookie)</script>
+		/<script[^>]*>[^<]*document\.cookie[^<]*<\/script>/i,
 	],
 
 	sqlInjection: [
@@ -121,6 +124,10 @@ const securityPatterns = {
 		// Blind SQL injection
 		/1[\s\/\*]+AND[\s\/\*]+\(SELECT/i,
 		/1[\s\/\*]+AND[\s\/\*]+SLEEP\(/i,
+
+		// ' OR '1'='1 regex
+		/(?:'|\")(?:\s+OR\s+['|\"]1['|\"]=['|\"]1)/i,
+		/(%|)\s*OR\s*%/i,
 	],
 
 	cookieInjection: [
@@ -145,6 +152,8 @@ const securityPatterns = {
 		// Domain scope manipulation
 		/domain=(?:\.[^;]+)/i, // Starts with dot
 		/path=(?:\/[^;]*)/i, // Starts with slash
+		/Path=(?:\/[^;]*)/i, // Capitalized path
+		/session=(?:true|false|)/i,
 	],
 
 	directoryTraversal: [
@@ -178,6 +187,9 @@ const securityPatterns = {
 		// Parameter entities
 		/%(?:file|include|resource)\s*;/i,
 		/%\w+\s*;/,
+
+		// <foo xmlns:xi="http://www.w3.org/2001/XInclude"><xi:include parse="text" href="file:///etc/passwd"/></foo>
+		/<\w+\s+xmlns:xi="http:\/\/www\.w3\.org\/2001\/XInclude"><xi:include\s+parse="text"\s+href="file:\/\/\/etc\/passwd"\/><\/\w+>/i,
 	],
 
 	maliciousHeaders: {
@@ -663,62 +675,6 @@ class SpecificationBasedDetection {
 				}),
 			},
 		},
-
-		// '/api/accounts/deposit/basic': {
-		// 	POST: {
-		// 		request: z.object({
-		// 			headers: SpecificationBasedDetection.defaultRequestHeadersSchema.extend({
-		// 				'content-type': z.string().max(50).toLowerCase(),
-		// 			}),
-		// 			body: z.object({
-		// 				org_code: z.string().length(10),
-		// 				account_num: z.string().max(20),
-		// 				seqno: z.string().max(7),
-		// 				search_timestamp: z.number().max(99999999999999),
-		// 			}),
-		// 		}),
-		// 		response: z.object({
-		// 			headers: SpecificationBasedDetection.defaultResponseHeadersSchema,
-		// 			body: z.object({
-		// 				rsp_code: z.string().max(5),
-		// 				rsp_msg: z.string().max(450),
-		// 				search_timestamp: z.number().max(99999999999999),
-		// 			}),
-		// 		}),
-		// 	},
-		// },
-
-		// '/api/accounts/deposit/detail': {
-		// 	POST: {
-		// 		request: z.object({
-		// 			headers: SpecificationBasedDetection.defaultRequestHeadersSchema,
-		// 			body: z.object({
-		// 				org_code: z.string().length(10),
-		// 				account_num: z.string().length(20),
-		// 				seqno: z.string().max(7),
-		// 				search_timestamp: z.string().length(14),
-		// 			}),
-		// 		}),
-		// 		response: z.object({
-		// 			body: z.object({
-		// 				rsp_code: z.string().max(5),
-		// 				rsp_msg: z.string().max(450),
-		// 				search_timestamp: z.number().max(14),
-		// 				detail_cnt: z.number().max(999),
-		// 				detail_list: z.array(z.object({})),
-		// 				currency_code: z
-		// 					.string()
-		// 					.max(3)
-		// 					.toUpperCase()
-		// 					.refine((val) => ['KRW', 'USD', 'EUR', 'CNY', 'JPY'].includes(val)),
-		// 				Balance_amt: z.number().max(99999999999),
-		// 				withdrawable_amt: z.number().max(99999999999),
-		// 				offered_rate: z.number().max(9999999),
-		// 				last_paid_in_cnt: z.number().max(999999),
-		// 			}),
-		// 		}),
-		// 	},
-		// },
 	};
 
 	detect(entry: LogEntry): DetectionResult {

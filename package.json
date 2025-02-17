@@ -10,8 +10,7 @@
 		"lint": "next lint",
 		"seedCA": "ts-node scripts/seedCA.ts",
 		"seedOrg": "ts-node scripts/seedOrg.ts",
-		"detect": "ts-node scripts/detection.ts",
-		"detect2": "ts-node scripts/detectionV2.ts"
+		"detect": "ts-node scripts/detectionV2.ts"
 	},
 	"dependencies": {
 		"@faker-js/faker": "^9.4.0",
