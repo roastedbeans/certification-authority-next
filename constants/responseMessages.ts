@@ -59,6 +59,10 @@ export const ResponseCodes = {
 		code: '2004',
 		message: 'Invalid signature transaction ID',
 	},
+	INVALID_TX_ID: {
+		code: '2005',
+		message: 'Invalid transaction ID',
+	},
 
 	// Business logic errors (3000-3999)
 	SIGNATURE_GENERATION_FAILED: {
