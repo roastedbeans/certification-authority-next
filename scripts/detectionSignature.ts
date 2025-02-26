@@ -343,7 +343,6 @@ class SignatureBasedDetection {
 				reason: 'SQL Injection attempt detected',
 			};
 		}
-
 		// Check SSRF
 		if (SignatureBasedDetection.KNOWN_ATTACK_PATTERNS.ssrf.some((pattern) => pattern.test(fullLines))) {
 			return {
@@ -351,7 +350,6 @@ class SignatureBasedDetection {
 				reason: 'SSRF attempt detected',
 			};
 		}
-
 		// Check XSS
 		if (SignatureBasedDetection.KNOWN_ATTACK_PATTERNS.xss.some((pattern) => pattern.test(fullLines))) {
 			return {
@@ -359,7 +357,6 @@ class SignatureBasedDetection {
 				reason: 'XSS attempt detected',
 			};
 		}
-
 		// Check XXE
 		if (SignatureBasedDetection.KNOWN_ATTACK_PATTERNS.xxe.some((pattern) => pattern.test(fullLines))) {
 			return {
@@ -367,7 +364,6 @@ class SignatureBasedDetection {
 				reason: 'XXE attempt detected',
 			};
 		}
-
 		// Check Path Traversal
 		if (SignatureBasedDetection.KNOWN_ATTACK_PATTERNS.pathTraversal.some((pattern) => pattern.test(fullLines))) {
 			return {
@@ -375,7 +371,6 @@ class SignatureBasedDetection {
 				reason: 'Path traversal attempt detected',
 			};
 		}
-
 		// Check Cookie Injection
 		if (SignatureBasedDetection.KNOWN_ATTACK_PATTERNS.cookieInjection.some((pattern) => pattern.test(fullLines))) {
 			return {
@@ -383,7 +378,6 @@ class SignatureBasedDetection {
 				reason: 'Cookie Injection attempt detected',
 			};
 		}
-
 		// Check File Upload
 		if (SignatureBasedDetection.KNOWN_ATTACK_PATTERNS.fileUpload.some((pattern) => pattern.test(bodyStr))) {
 			return {
@@ -391,7 +385,6 @@ class SignatureBasedDetection {
 				reason: 'File Upload attempt detected',
 			};
 		}
-
 		// Check Command Injection
 		if (SignatureBasedDetection.KNOWN_ATTACK_PATTERNS.commandInjection.some((pattern) => pattern.test(bodyStr))) {
 			return {
@@ -399,7 +392,6 @@ class SignatureBasedDetection {
 				reason: 'Command Injection attempt detected',
 			};
 		}
-
 		// Check headers
 		for (const [headerName, patterns] of Object.entries(
 			SignatureBasedDetection.KNOWN_ATTACK_PATTERNS.maliciousHeaders

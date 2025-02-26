@@ -13,8 +13,8 @@
 		"detect": "ts-node scripts/detectionV2.ts",
 		"detectAll": "ts-node scripts/detectionV2.ts scripts/detectionHybrid.ts",
 		"hybrid": "ts-node scripts/detectionHybrid.ts",
-		"specification": "ts-node scripts/detectSpecification.ts",
-		"signature": "ts-node scripts/detectSignature.ts"
+		"specification": "ts-node scripts/detectionSpecification.ts",
+		"signature": "ts-node scripts/detectionSignature.ts"
 	},
 	"dependencies": {
 		"@faker-js/faker": "^9.4.0",

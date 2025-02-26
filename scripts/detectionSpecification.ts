@@ -135,7 +135,7 @@ class SpecificationBasedDetection {
 	private static readonly rateLimiting = {
 		rateLimiting: {
 			maxRequestsPerMinute: 100,
-			maxPayloadSize: 1000000,
+			maxPayloadSize: 1000,
 		},
 	};
 
@@ -513,16 +513,69 @@ class SpecificationBasedDetection {
 		return requests.length > SpecificationBasedDetection.rateLimiting.rateLimiting.maxRequestsPerMinute;
 	}
 
-	private isPayloadSizeExceeded(entry: LogEntry): boolean {
-		const bodySize = Buffer.from(
-			typeof entry.request.body === 'string' ? entry.request.body : JSON.stringify(entry.request.body)
-		).length;
-		return bodySize > SpecificationBasedDetection.rateLimiting.rateLimiting.maxPayloadSize;
+	private isPayloadSizeExceeded(entry: LogEntry): { isExceeded: boolean; overloadedFields: string[] } {
+		const maxSize = SpecificationBasedDetection.rateLimiting.rateLimiting.maxPayloadSize;
+		const overloadedFields: string[] = [];
+
+		if (entry.request && entry.requestBody) {
+			console.log('entry.request', entry.request);
+			// Check all fields individually
+			const fieldsToCheck = {
+				url: entry.request.url,
+				method: entry.request.method,
+				authorization: entry.request.authorization,
+				'user-agent': entry.request['user-agent'],
+				'x-api-tran-id': entry.request['x-api-tran-id'],
+				'x-api-type': entry.request['x-api-type'],
+				'x-csrf-token': entry.request['x-csrf-token'],
+				cookie: entry.request.cookie,
+				'set-cookie': entry.request['set-cookie'],
+				'content-length': entry.request['content-length'],
+				body: entry.request.body,
+			};
+
+			for (const [key, value] of Object.entries(fieldsToCheck)) {
+				console.log('key', key);
+				if (value && typeof value === 'string') {
+					const size = Buffer.from(String(value)).length;
+					if (size > maxSize) {
+						console.log('value', value, size);
+						overloadedFields.push(key);
+						entry.request[key as keyof RequestData] = 'overload here';
+					}
+				} else {
+					const toString = JSON.stringify(value);
+					const size = Buffer.from(toString).length;
+					if (size > maxSize) {
+						console.log('value', value, size);
+						overloadedFields.push(key);
+						entry.request[key as keyof RequestData] = 'overload here';
+					}
+				}
+			}
+
+			// Handle additional fields from index signature
+			const standardKeys = Object.keys(fieldsToCheck);
+			Object.entries(entry.request).forEach(([key, value]) => {
+				if (!standardKeys.includes(key)) {
+					const size = Buffer.from(String(value)).length;
+					if (size > maxSize) {
+						overloadedFields.push(key);
+						entry.request[key] = 'overload here';
+					}
+				}
+			});
+		}
+
+		return {
+			isExceeded: overloadedFields.length > 0,
+			overloadedFields,
+		};
 	}
 
 	detect(entry: LogEntry): DetectionResult {
 		// Check rate limiting
-		const clientId = entry.request['x-api-tran-id']; // Assuming x-api-tran-id is the client ID
+		const clientId = entry.request['x-api-tran-id'];
 		if (this.isRateLimitExceeded(clientId)) {
 			return {
 				detected: true,
@@ -531,10 +584,12 @@ class SpecificationBasedDetection {
 		}
 
 		// Check payload size
-		if (this.isPayloadSizeExceeded(entry)) {
+		const payloadCheck = this.isPayloadSizeExceeded(entry);
+		console.log('payload check', payloadCheck);
+		if (payloadCheck.isExceeded) {
 			return {
 				detected: true,
-				reason: 'Payload size exceeded',
+				reason: `Payload size exceeded in fields: ${payloadCheck.overloadedFields.join(', ')}`,
 			};
 		}
 

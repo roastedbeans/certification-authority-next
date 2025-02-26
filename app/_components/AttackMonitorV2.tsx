@@ -5,6 +5,7 @@ import Papa from 'papaparse';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, ShieldCheck, ShieldAlert, Activity, AlertCircle } from 'lucide-react';
+import { LogRecord } from './AttackMonitor';
 
 // Interfaces and type definitions
 interface CALogRecord {
@@ -16,15 +17,15 @@ interface CALogRecord {
 	'attack.type': string;
 }
 
-interface LogRecord {
-	index?: number;
-	timestamp: string;
-	detectionType: 'Signature' | 'Specification' | 'Hybrid';
-	detected: string;
-	reason: string;
-	request: string;
-	response: string;
-}
+// interface LogRecord {
+// 	index?: number;
+// 	timestamp: string;
+// 	detectionType: 'Signature' | 'Specification' | 'Hybrid';
+// 	detected: string;
+// 	reason: string;
+// 	request: string;
+// 	response: string;
+// }
 
 interface ConfusionMatrix {
 	truePositives: number;
@@ -70,12 +71,24 @@ const MetricCard = ({ title, value, icon }: { title: string; value: number; icon
 	);
 };
 
-const ConfusionMatrixVisualizer = () => {
+interface ConfusionMatrixVisualizerProps {
+	logsData: CALogRecord[];
+	specificationLogsData: LogRecord[];
+	signatureLogsData: LogRecord[];
+	hybridLogsData: LogRecord[];
+}
+
+const ConfusionMatrixVisualizer = ({
+	logsData,
+	specificationLogsData,
+	signatureLogsData,
+	hybridLogsData,
+}: ConfusionMatrixVisualizerProps) => {
 	// State for logs and matrices
-	const [logs, setLogs] = useState<CALogRecord[]>([]);
-	const [specificationLogs, setSpecificationLogs] = useState<LogRecord[]>([]);
-	const [signatureLogs, setSignatureLogs] = useState<LogRecord[]>([]);
-	const [hybridLogs, setHybridLogs] = useState<LogRecord[]>([]);
+	const [logs, setLogs] = useState<CALogRecord[]>(logsData);
+	const [specificationLogs, setSpecificationLogs] = useState<LogRecord[]>(specificationLogsData);
+	const [signatureLogs, setSignatureLogs] = useState<LogRecord[]>(signatureLogsData);
+	const [hybridLogs, setHybridLogs] = useState<LogRecord[]>(hybridLogsData);
 
 	const [specMatrix, setSpecMatrix] = useState<ConfusionMatrix | null>(null);
 	const [sigMatrix, setSigMatrix] = useState<ConfusionMatrix | null>(null);
@@ -102,6 +115,19 @@ const ConfusionMatrixVisualizer = () => {
 
 		return lookup;
 	};
+
+	useEffect(() => {
+		if (logs.length > 0 && specificationLogs.length && signatureLogs.length && hybridLogs.length) {
+			const newAttackMap = createAttackLookup(logs);
+			setAttackMap(newAttackMap);
+		}
+		if (logs && specificationLogs && signatureLogs && hybridLogs) {
+			setLogs(logsData);
+			setSpecificationLogs(specificationLogsData);
+			setSignatureLogs(signatureLogsData);
+			setHybridLogs(hybridLogsData);
+		}
+	}, [logsData, specificationLogsData, signatureLogsData, hybridLogsData]);
 
 	// Fixed function that properly populates all matrix cells
 	const generateConfusionMatrix = (detectionLogs: LogRecord[], mainLogs: CALogRecord[]): ConfusionMatrix => {
@@ -188,52 +214,52 @@ const ConfusionMatrixVisualizer = () => {
 	};
 
 	// Fetch and process log data
-	useEffect(() => {
-		const fetchLogs = async (
-			url: string,
-			setState: React.Dispatch<React.SetStateAction<any[]>>,
-			parseData: (data: any[]) => any[]
-		) => {
-			try {
-				const res = await fetch(url);
-				const csvText = await res.text();
-				const { data } = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-				data.reverse();
-				const indexedData = parseData(data);
-				setState(indexedData);
-			} catch (err) {
-				console.error(err);
-			}
-		};
+	// useEffect(() => {
+	// 	const fetchLogs = async (
+	// 		url: string,
+	// 		setState: React.Dispatch<React.SetStateAction<any[]>>,
+	// 		parseData: (data: any[]) => any[]
+	// 	) => {
+	// 		try {
+	// 			const res = await fetch(url);
+	// 			const csvText = await res.text();
+	// 			const { data } = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+	// 			data.reverse();
+	// 			const indexedData = parseData(data);
+	// 			setState(indexedData);
+	// 		} catch (err) {
+	// 			console.error(err);
+	// 		}
+	// 	};
 
-		const parseLogData = (data: any[]) =>
-			data.map((item: any, index: number) => ({ ...item, index: data.length - index }));
+	// 	const parseLogData = (data: any[]) =>
+	// 		data.map((item: any, index: number) => ({ ...item, index: data.length - index }));
 
-		const loadData = async () => {
-			// Load all logs
-			await fetchLogs('/ca_formatted_logs.csv', (data) => setLogs(data as CALogRecord[]), parseLogData);
-			await fetchLogs('/specification_detection_logs.csv', setSpecificationLogs, parseLogData);
-			await fetchLogs('/signature_detection_logs.csv', setSignatureLogs, parseLogData);
-			await fetchLogs('/hybrid_detection_logs.csv', setHybridLogs, parseLogData);
+	// 	const loadData = async () => {
+	// 		// Load all logs
+	// 		await fetchLogs('/ca_formatted_logs.csv', (data) => setLogs(data as CALogRecord[]), parseLogData);
+	// 		await fetchLogs('/specification_detection_logs.csv', setSpecificationLogs, parseLogData);
+	// 		await fetchLogs('/signature_detection_logs.csv', setSignatureLogs, parseLogData);
+	// 		await fetchLogs('/hybrid_detection_logs.csv', setHybridLogs, parseLogData);
 
-			// Update timestamp
-			setLastUpdated(new Date().toLocaleTimeString());
-		};
+	// 		// Update timestamp
+	// 		setLastUpdated(new Date().toLocaleTimeString());
+	// 	};
 
-		loadData();
+	// 	loadData();
 
-		// Set up polling for real-time updates
-		const interval = setInterval(loadData, 5000);
-		return () => clearInterval(interval);
-	}, []);
+	// 	// Set up polling for real-time updates
+	// 	const interval = setInterval(loadData, 5000);
+	// 	return () => clearInterval(interval);
+	// }, []);
 
 	// Build attack lookup map when main logs change
-	useEffect(() => {
-		if (logs.length > 0) {
-			const newAttackMap = createAttackLookup(logs);
-			setAttackMap(newAttackMap);
-		}
-	}, [logs]);
+	// useEffect(() => {
+	// 	if (logs.length > 0) {
+	// 		const newAttackMap = createAttackLookup(logs);
+	// 		setAttackMap(newAttackMap);
+	// 	}
+	// }, [logs]);
 
 	// Inside your component, update the useEffect that calculates matrices
 	useEffect(() => {

@@ -5,15 +5,25 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import Papa from 'papaparse';
 import AttackMonitorV2 from './AttackMonitorV2';
 
-interface LogRecord {
+export interface LogRecord {
 	index?: number;
 	timestamp: string;
-	detectionType: 'Signature' | 'Specification';
+	detectionType: 'Signature' | 'Specification' | 'Hybrid';
 	detected: boolean | string;
 	reason: string;
 	request: string;
 	response: string;
 }
+
+const headers = [
+	{ name: 'Index', width: 'w-16' },
+	{ name: 'Attack Type', width: 'w-24' },
+	{ name: 'Method', width: 'w-16' },
+	{ name: 'URL', width: 'w-[560px]' },
+	{ name: 'Signature', width: 'w-28' },
+	{ name: 'Specification', width: 'w-28' },
+	{ name: 'Hybrid', width: 'w-28' },
+];
 
 const LogMonitor = () => {
 	const [logs, setLogs] = useState<any[]>([]);
@@ -32,7 +42,7 @@ const LogMonitor = () => {
 				const csvText = await res.text();
 				const { data } = Papa.parse(csvText, { header: true, skipEmptyLines: true });
 
-				const indexedData = parseData(data).filter((_, index) => index < 1000);
+				const indexedData = parseData(data).filter((_, index) => index < 10000);
 				setState(indexedData);
 			} catch (err) {
 				console.error(err);
@@ -60,16 +70,25 @@ const LogMonitor = () => {
 					</CardHeader>
 					<CardContent className='w-full'>
 						<div className='flex flex-col pr-2 h-[680px] overflow-y-scroll'>
+							<div className='flex border-t p-2 gap-4 font-semibold'>
+								{headers.map((header) => (
+									<div
+										className={`${header.width}`}
+										key={header.name}>
+										{header.name}
+									</div>
+								))}
+							</div>
 							{logs.map((row: any, index) => (
 								<div
 									key={index}
 									className={`flex border-t p-2 gap-4 ${
 										hybridLogs[index]?.detected === 'false' && (row['attack.type'] as string) ? 'bg-red-200' : ''
 									}`}>
-									<div>
+									<div className='w-16'>
 										<p>{row.index}</p>
 									</div>
-									<div className='w-24 overflow-clip'>
+									<div className='w-24 overflow-clip text-ellipsis'>
 										<p className='uppercase font-semibold text-red-500'>
 											{row['attack.type'] as string}
 											{row['attack.type'] === '' && row['response.status'] === '400' && 'Invalid'}
@@ -78,30 +97,49 @@ const LogMonitor = () => {
 									<div className='w-16'>
 										<p>{row['request.method']}</p>
 									</div>
-									<div className='w-[600px] overflow-clip'>
+									<div className='w-[560px] overflow-clip'>
 										<p className='overflow-hidden'>{row['request.url']}</p>
 									</div>
-									{/* <div>
-										{specificationLogs[index]?.detected === 'true' && (
-											<span>{JSON.parse(specificationLogs[index].request)?.['attack-type']}</span>
+									<div className='w-28 overflow-hidden text-ellipsis'>
+										[
+										{signatureLogs[index]?.detected === 'true' ? (
+											<span>{signatureLogs[index] && JSON.parse(signatureLogs[index].request)?.['attack-type']}</span>
+										) : (
+											<span>none</span>
 										)}
+										]
 									</div>
-									<div>
-										{signatureLogs[index]?.detected === 'true' && (
-											<span>{JSON.parse(signatureLogs[index].request)?.['attack-type']}</span>
+									<div className='w-28 overflow-hidden text-ellipsis'>
+										[
+										{specificationLogs[index]?.detected === 'true' ? (
+											<span>
+												{specificationLogs[index] && JSON.parse(specificationLogs[index].request)?.['attack-type']}
+											</span>
+										) : (
+											<span>none</span>
 										)}
-									</div> */}
-									<div>
-										{hybridLogs[index]?.detected === 'true' && (
+										]
+									</div>
+									<div className='w-28 overflow-hidden text-ellipsis'>
+										[
+										{hybridLogs[index]?.detected === 'true' ? (
 											<span>{hybridLogs[index] && JSON.parse(hybridLogs[index].request)?.['attack-type']}</span>
+										) : (
+											<span>none</span>
 										)}
+										]
 									</div>
 								</div>
 							))}
 						</div>
 					</CardContent>
 				</Card>
-				<AttackMonitorV2 />
+				<AttackMonitorV2
+					logsData={logs}
+					specificationLogsData={specificationLogs}
+					signatureLogsData={signatureLogs}
+					hybridLogsData={hybridLogs}
+				/>
 			</div>
 			<div className='flex flex-col gap-4 w-[680px] h-full justify-between'>
 				<Card className='w-full h-fit'>
