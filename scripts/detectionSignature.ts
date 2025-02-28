@@ -1,3 +1,4 @@
+// dectionSignature.ts - Signature-based detection implementation on Certification Authority APIs
 import { createObjectCsvWriter as createCsvWriter } from 'csv-writer';
 import fs from 'fs';
 import { z } from 'zod';
