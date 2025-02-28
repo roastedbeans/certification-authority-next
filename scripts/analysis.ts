@@ -147,26 +147,22 @@ class LogMonitor {
 
 		console.log(`\n${title} CONFUSION MATRIX:`);
 
-		// Top row - True Positive and False Positive
-		console.log('┌───────────────────────────────────┐ ┌───────────────────────────────────┐');
+		// Create the table
+		console.log('┌─────────┬───────────────────────────────────────┐');
+		console.log('│         │ Prediction                            │');
+		console.log('│         ├───────────────────┬───────────────────┤');
+		console.log('│         │ Normal            │ Anomaly           │');
+		console.log('├─────────┼───────────────────┼───────────────────┤');
 		console.log(
-			`               ${matrix.truePositive
-				.toString()
-				.padStart(4)}                                   ${matrix.falsePositive.toString().padStart(4)}`
+			`│ Actual  │ ${matrix.trueNegative.toString().padEnd(17)} │ ${matrix.falsePositive.toString().padEnd(17)} │`
 		);
-		console.log('│ True Positive (Anomaly x Anomaly) │ │ False Positive (Normal x Anomaly) │');
-		console.log(`            (${tpPercent}%)                                 (${fpPercent}%)          `);
-		console.log('└───────────────────────────────────┘ └───────────────────────────────────┘');
-
-		console.log('┌───────────────────────────────────┐ ┌───────────────────────────────────┐');
+		console.log('│ Normal  │                   │                   │');
+		console.log('├─────────┼───────────────────┼───────────────────┤');
 		console.log(
-			`                ${matrix.falseNegative
-				.toString()
-				.padStart(4)}                                   ${matrix.trueNegative.toString().padStart(4)}`
+			`│ Actual  │ ${matrix.falseNegative.toString().padEnd(17)} │ ${matrix.truePositive.toString().padEnd(17)} │`
 		);
-		console.log('│ False Negative (Anomaly x Normal) │ │ True Negative (Normal x Normal)   │');
-		console.log(`               (${fnPercent}%)                                (${tnPercent}%)`);
-		console.log('└───────────────────────────────────┘ └───────────────────────────────────┘');
+		console.log('│ Anomaly │                   │                   │');
+		console.log('└─────────┴───────────────────┴───────────────────┘');
 	}
 
 	private displaySummary(): void {
