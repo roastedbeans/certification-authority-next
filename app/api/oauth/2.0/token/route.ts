@@ -18,6 +18,109 @@ interface RequestBody {
 
 // a request is sent -> attack detection module https:attackfinder.com/api/detectattack -> certification authority
 
+/**
+ * @swagger
+ * /api/oauth/2.0/token:
+ *   post:
+ *     summary: OAuth 2.0 token endpoint
+ *     description: Generates an access token using client credentials grant type
+ *     tags:
+ *       - OAuth
+ *     consumes:
+ *       - application/x-www-form-urlencoded
+ *     parameters:
+ *       - in: header
+ *         name: x-api-tran-id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: API transaction ID for request tracking
+ *       - in: formData
+ *         name: grant_type
+ *         schema:
+ *           type: string
+ *           enum: [client_credentials]
+ *         required: true
+ *         description: OAuth 2.0 grant type (must be 'client_credentials')
+ *       - in: formData
+ *         name: client_id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: OAuth client ID
+ *       - in: formData
+ *         name: client_secret
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: OAuth client secret
+ *       - in: formData
+ *         name: scope
+ *         schema:
+ *           type: string
+ *           enum: [ca]
+ *         required: true
+ *         description: API access scope (must be 'ca')
+ *     responses:
+ *       200:
+ *         description: Successful token generation
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rsp_code:
+ *                   type: string
+ *                   example: "000"
+ *                 rsp_msg:
+ *                   type: string
+ *                   example: "Success"
+ *                 token_type:
+ *                   type: string
+ *                   example: "Bearer"
+ *                 access_token:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 expires_in:
+ *                   type: integer
+ *                   example: 3600
+ *                 scope:
+ *                   type: string
+ *                   example: "ca"
+ *       400:
+ *         description: Invalid request parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *       401:
+ *         description: Invalid client credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ */
 export async function POST(req: NextRequest) {
 	const headers = req.headers;
 	const headersList = Object.fromEntries(headers.entries());

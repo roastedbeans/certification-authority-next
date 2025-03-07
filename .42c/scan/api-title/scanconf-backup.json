@@ -1,0 +1,322 @@
+{
+  "version": "2.0.0",
+  "runtimeConfiguration": {
+    "environment": "default",
+    "laxTestingModeEnabled": false,
+    "apiConnectivityCheck": true,
+    "logLevel": "error",
+    "logDestination": "stdout+platform",
+    "logMaxFileSize": 2147483648,
+    "requestHeaderNameRequestId": "x-scan-request-id",
+    "requestHeaderNameScenarioId": "x-scan-scenario-id",
+    "requestHeaderNameRequestType": "x-scan-request-type",
+    "requestFlowrate": 100,
+    "requestTimeout": 30,
+    "requestTlsInsecureSkipVerify": true,
+    "responseFollowRedirection": false,
+    "responseMaxBodySizeScan": 10485760,
+    "happyPathOnly": false,
+    "maxRequestRetryAttempts": 5,
+    "maxScanDuration": 1800,
+    "memoryLimit": 2147483648,
+    "memoryTimeSpan": 10,
+    "reportMaxRequestSizeHappyPath": 8092,
+    "reportMaxRequestSizeTest": 8092,
+    "reportIncludeRequestBody": true,
+    "reportIncludeResponseBody": true,
+    "reportMaxHttpResponseSizeHappyPath": 8092,
+    "reportMaxBodySizeHappyPath": 8092,
+    "reportMaxHttpResponseSizeTest": 8092,
+    "reportMaxBodySizeTest": 8092,
+    "reportIssuesOnly": false,
+    "reportMaxIssues": 1000,
+    "reportMaxSize": 20971520,
+    "reportGenerateCurlCommand": true
+  },
+  "customizations": {
+    "happyPaths": {
+      "retry": 1,
+      "responsePolicy": {
+        "httpStatusExpected": true,
+        "mustBeConformant": true
+      },
+      "httpStatusExpected": []
+    },
+    "tests": {
+      "responsePolicy": {
+        "httpStatusExpected": true,
+        "mustBeConformant": true
+      }
+    }
+  },
+  "operations": {
+    "/api/ca/sign_request:post": {
+      "operationId": "/api/ca/sign_request:post",
+      "scenarios": [
+        {
+          "key": "happy.path",
+          "fuzzing": true,
+          "requests": [
+            {
+              "$ref": "#/operations/~1api~1ca~1sign_request:post/request",
+              "fuzzing": true
+            }
+          ]
+        }
+      ],
+      "request": {
+        "operationId": "/api/ca/sign_request:post",
+        "request": {
+          "type": "42c",
+          "details": {
+            "url": "{{host}}/api/ca/sign_request",
+            "method": "POST",
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "requestBody": {
+              "mode": "json",
+              "json": {}
+            }
+          }
+        },
+        "defaultResponse": "200",
+        "responses": {
+          "200": {
+            "expectations": {
+              "httpStatus": 200
+            }
+          },
+          "400": {
+            "expectations": {
+              "httpStatus": 400
+            }
+          },
+          "401": {
+            "expectations": {
+              "httpStatus": 401
+            }
+          },
+          "403": {
+            "expectations": {
+              "httpStatus": 403
+            }
+          },
+          "500": {
+            "expectations": {
+              "httpStatus": 500
+            }
+          }
+        }
+      }
+    },
+    "/api/ca/sign_result:post": {
+      "operationId": "/api/ca/sign_result:post",
+      "scenarios": [
+        {
+          "key": "happy.path",
+          "fuzzing": true,
+          "requests": [
+            {
+              "$ref": "#/operations/~1api~1ca~1sign_result:post/request",
+              "fuzzing": true
+            }
+          ]
+        }
+      ],
+      "request": {
+        "operationId": "/api/ca/sign_result:post",
+        "request": {
+          "type": "42c",
+          "details": {
+            "url": "{{host}}/api/ca/sign_result",
+            "method": "POST",
+            "headers": [
+              {
+                "key": "x-api-tran-id",
+                "value": "ipcnsvyqemfdisnfjpmefyyyi"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "requestBody": {
+              "mode": "json",
+              "json": {
+                "cert_tx_id": "1234567890abcdef1234567890abcdef12345678",
+                "sign_tx_id": "ORG001_CA001_1234567890abcdef1234567890abcdef12345678"
+              }
+            }
+          }
+        },
+        "defaultResponse": "200",
+        "responses": {
+          "200": {
+            "expectations": {
+              "httpStatus": 200
+            }
+          },
+          "400": {
+            "expectations": {
+              "httpStatus": 400
+            }
+          },
+          "401": {
+            "expectations": {
+              "httpStatus": 401
+            }
+          },
+          "500": {
+            "expectations": {
+              "httpStatus": 500
+            }
+          }
+        }
+      }
+    },
+    "/api/oauth/2.0/token:post": {
+      "operationId": "/api/oauth/2.0/token:post",
+      "scenarios": [
+        {
+          "key": "happy.path",
+          "fuzzing": true,
+          "requests": [
+            {
+              "$ref": "#/operations/~1api~1oauth~12.0~1token:post/request",
+              "fuzzing": true
+            }
+          ]
+        }
+      ],
+      "request": {
+        "operationId": "/api/oauth/2.0/token:post",
+        "request": {
+          "type": "42c",
+          "details": {
+            "url": "{{host}}/api/oauth/2.0/token",
+            "method": "POST",
+            "headers": [
+              {
+                "key": "grant_type",
+                "value": "client_credentials"
+              },
+              {
+                "key": "client_id",
+                "value": "euoeaslbmmxcanokppzfqczglriywrnr"
+              },
+              {
+                "key": "client_secret",
+                "value": "comezfkopxgqmyrydyzypexsrrnvjsdn"
+              },
+              {
+                "key": "scope",
+                "value": "ca"
+              },
+              {
+                "key": "x-api-tran-id",
+                "value": "hhlpelxwunbipszdqhijdbujdyekdpqe"
+              }
+            ]
+          }
+        },
+        "defaultResponse": "200",
+        "responses": {
+          "200": {
+            "expectations": {
+              "httpStatus": 200
+            }
+          },
+          "400": {
+            "expectations": {
+              "httpStatus": 400
+            }
+          },
+          "401": {
+            "expectations": {
+              "httpStatus": 401
+            }
+          },
+          "500": {
+            "expectations": {
+              "httpStatus": 500
+            }
+          }
+        }
+      }
+    },
+    "/api/ca/sign_verification:post": {
+      "operationId": "/api/ca/sign_verification:post",
+      "scenarios": [
+        {
+          "key": "happy.path",
+          "fuzzing": true,
+          "requests": [
+            {
+              "$ref": "#/operations/~1api~1ca~1sign_verification:post/request",
+              "fuzzing": true
+            }
+          ]
+        }
+      ],
+      "request": {
+        "operationId": "/api/ca/sign_verification:post",
+        "request": {
+          "type": "42c",
+          "details": {
+            "url": "{{host}}/api/ca/sign_verification",
+            "method": "POST",
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "requestBody": {
+              "mode": "json",
+              "json": {}
+            }
+          }
+        },
+        "defaultResponse": "200",
+        "responses": {
+          "200": {
+            "expectations": {
+              "httpStatus": 200
+            }
+          },
+          "400": {
+            "expectations": {
+              "httpStatus": 400
+            }
+          },
+          "401": {
+            "expectations": {
+              "httpStatus": 401
+            }
+          },
+          "500": {
+            "expectations": {
+              "httpStatus": 500
+            }
+          }
+        }
+      }
+    }
+  },
+  "environments": {
+    "default": {
+      "variables": {
+        "host": {
+          "from": "environment",
+          "name": "SCAN42C_HOST",
+          "required": false,
+          "default": "https://api.server.test/v1"
+        }
+      }
+    }
+  }
+}

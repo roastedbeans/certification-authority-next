@@ -14,6 +14,91 @@ const validateAuthorizationHeader = (header: string | null): boolean => {
 	return type === 'Bearer' && !!token;
 };
 
+/**
+ * @swagger
+ * /api/ca/sign_result:
+ *   post:
+ *     summary: Processes signing result and creates signed consent records
+ *     description: Endpoint for handling certificate signing results. Validates input parameters,
+ *                  creates signed consent records from the certificate data, and returns the formatted list.
+ *     tags:
+ *       - Certificate Authority
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - cert_tx_id
+ *               - sign_tx_id
+ *             properties:
+ *               cert_tx_id:
+ *                 type: string
+ *                 description: Certificate transaction ID
+ *                 example: "1234567890abcdef1234567890abcdef12345678"
+ *               sign_tx_id:
+ *                 type: string
+ *                 description: Sign transaction ID
+ *                 example: "ORG001_CA001_1234567890abcdef1234567890abcdef12345678"
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Authorization header for API access
+ *       - in: header
+ *         name: x-api-tran-id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           maxLength: 25
+ *         description: Transaction ID for request tracking
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rsp_code:
+ *                   type: string
+ *                   description: Response code
+ *                 rsp_msg:
+ *                   type: string
+ *                   description: Response message
+ *                 signed_consent_cnt:
+ *                   type: integer
+ *                   description: Count of signed consents
+ *                 signed_consent_list:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       signed_consent_len:
+ *                         type: integer
+ *                         description: Length of signed consent data
+ *                       signed_consent:
+ *                         type: string
+ *                         description: Signed consent data
+ *                       tx_id:
+ *                         type: string
+ *                         description: Transaction ID
+ *                       user_id:
+ *                         type: string
+ *                         description: User ID
+ *                       certificate_id:
+ *                         type: string
+ *                         description: Certificate ID
+ *       400:
+ *         description: Bad request (Invalid parameters)
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 export async function POST(req: NextRequest) {
 	const headers = req.headers;
 	const headersList = Object.fromEntries(headers.entries());

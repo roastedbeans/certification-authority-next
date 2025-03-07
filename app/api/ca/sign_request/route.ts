@@ -15,6 +15,135 @@ type Consent = {
 	consentLen: number;
 };
 
+/**
+ * @swagger
+ * /api/ca/sign_request:
+ *   post:
+ *     summary: Handles electronic signature requests.
+ *     description: Validates the request, processes the electronic signature, and returns a certification transaction ID.
+ *     tags:
+ *       - Certification Authority
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               sign_tx_id:
+ *                 type: string
+ *                 example: ORG2025001_CA20250001_20250117120000_RITFHJGITORP
+ *               user_ci:
+ *                 type: string
+ *                 example: 1234567890123456789012345678901234567890123456789012345678901234
+ *               real_name:
+ *                 type: string
+ *                 example: John Doe
+ *               phone_num:
+ *                 type: string
+ *                 example: +821012345678
+ *               request_title:
+ *                 type: string
+ *                 example: Request for personal information
+ *               device_code:
+ *                 type: string
+ *                 example: PC
+ *               device_browser:
+ *                 type: string
+ *                 example: WB
+ *               return_app_scheme_url:
+ *                 type: string
+ *                 example: mydata://auth
+ *               consent_cnt:
+ *                 type: number
+ *                 example: 1
+ *               consent_type:
+ *                 type: number
+ *                 example: 0
+ *               consent_list:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     consent:
+ *                       type: string
+ *                       example: 958675948576879
+ *                     consent_len:
+ *                       type: number
+ *                       example: 15
+ *                     consent_title:
+ *                       type: string
+ *                       example: Consent to share personal information
+ *                     tx_id:
+ *                       type: string
+ *                       example: MD1234567890_0987654321_1234567890_20250117120000_E349RU3IDKFJ
+ *     responses:
+ *       200:
+ *         description: Electronic signature request successful.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rsp_code:
+ *                   type: string
+ *                   example: 0000
+ *                 rsp_msg:
+ *                   type: string
+ *                   example: Electronic signature request successful, cert_tx_id has been provided.
+ *                 sign_ios_app_scheme_url:
+ *                   type: string
+ *                   example: mydataauth://auth?tx_id=ORG2025001
+ *                 sign_aos_app_scheme_url:
+ *                   type: string
+ *                   example: mydataauth://auth?tx_id=ORG2025001
+ *                 sign_web_url:
+ *                   type: string
+ *                   example: https://mydataauth.com/auth?tx_id=ORG2025001
+ *                 cert_tx_id:
+ *                   type: string
+ *                   example: CERT2025001
+ *       400:
+ *         description: Invalid request parameters.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid request parameters.
+ *       401:
+ *         description: Unauthorized request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Unauthorized request.
+ *       403:
+ *         description: Invalid token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid token.
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Internal Server Error.
+ */
 export async function POST(req: NextRequest) {
 	const headers = req.headers;
 	const headersList = Object.fromEntries(headers.entries());

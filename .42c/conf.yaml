@@ -1,0 +1,3 @@
+apis:
+  openapi.json:
+    alias: api-title

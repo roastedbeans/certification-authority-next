@@ -1,0 +1,1329 @@
+{
+	"openapi": "3.0.3",
+	"info": {
+		"title": "Mydata API",
+		"version": "1.0",
+		"description": "API for handling electronic signatures, certification operations, and account information"
+	},
+	"servers": [
+		{
+			"url": "http://localhost:5000",
+			"description": "Local development server"
+		},
+		{
+			"url": "https://localhost:4200",
+			"description": "Other bank API server"
+		}
+	],
+	"tags": [
+		{
+			"name": "Certification Authority",
+			"description": "Operations related to certification and signing processes"
+		},
+		{
+			"name": "OAuth",
+			"description": "Authentication operations"
+		},
+		{
+			"name": "Banking",
+			"description": "Banking account operations"
+		},
+		{
+			"name": "Management",
+			"description": "Management operations"
+		}
+	],
+	"paths": {
+		"/api/oauth/2.0/token": {
+			"post": {
+				"security": [],
+				"summary": "OAuth 2.0 token endpoint",
+				"description": "Generates an access token using client credentials grant type",
+				"tags": ["OAuth"],
+				"operationId": "getIA101",
+				"parameters": [
+					{
+						"in": "header",
+						"name": "x-api-tran-id",
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[a-zA-Z0-9]{1,25}$",
+							"example": "anya123456SDFRES202503051"
+						},
+						"required": true,
+						"description": "API transaction ID for request tracking"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/x-www-form-urlencoded": {
+							"schema": {
+								"type": "object",
+								"required": ["grant_type", "client_id", "client_secret", "scope"],
+								"properties": {
+									"grant_type": {
+										"type": "string",
+										"enum": ["client_credentials"],
+										"description": "OAuth 2.0 grant type (must be 'client_credentials')"
+									},
+									"client_id": {
+										"type": "string",
+										"description": "OAuth client ID",
+										"maxLength": 50,
+										"pattern": "^[a-zA-Z0-9]{1,50}$",
+										"example": "wcf8rjy6kphudsnea0l3ytkpdhqrvcxz1578m4q7xv9zb2teee"
+									},
+									"client_secret": {
+										"type": "string",
+										"description": "OAuth client secret",
+										"maxLength": 50,
+										"pattern": "^[a-zA-Z0-9]{1,50}$",
+										"example": "wcf8rjy6kphudsnea0l3ytkpdhqrvcxz1578m4q7xv9zb2teee"
+									},
+									"scope": {
+										"type": "string",
+										"enum": ["ca"],
+										"description": "API access scope (must be 'ca')"
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful token generation",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TokenResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid request parameters",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Invalid client credentials",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/ca/sign_request": {
+			"post": {
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"summary": "Handles electronic signature requests.",
+				"description": "Validates the request, processes the electronic signature, and returns a certification transaction ID.",
+				"tags": ["Certification Authority"],
+				"operationId": "getIA102",
+				"parameters": [
+					{
+						"in": "header",
+						"name": "x-api-tran-id",
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[a-zA-Z0-9]{1,25}$",
+							"example": "anya123456SDFRES202503051"
+						},
+						"required": true,
+						"description": "API transaction ID for request tracking"
+					},
+					{
+						"in": "header",
+						"name": "Authorization",
+						"schema": {
+							"type": "string",
+							"example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+						},
+						"required": true,
+						"description": "Bearer token for authorization"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SignRequest"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Electronic signature request successful.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SignResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid request parameters.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized request.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Invalid token.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/ca/sign_result": {
+			"post": {
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"summary": "Processes signing result and creates signed consent records",
+				"description": "Endpoint for handling certificate signing results. Validates input parameters, creates signed consent records from the certificate data, and returns the formatted list.",
+				"tags": ["Certification Authority"],
+				"operationId": "getIA103",
+				"parameters": [
+					{
+						"in": "header",
+						"name": "x-api-tran-id",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[a-zA-Z0-9]{1,25}$",
+							"example": "anya123456SDFRES202503051"
+						},
+						"description": "Transaction ID for request tracking"
+					},
+					{
+						"in": "header",
+						"name": "Authorization",
+						"schema": {
+							"type": "string",
+							"example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+						},
+						"required": true,
+						"description": "Bearer token for authorization"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SignResultRequest"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful operation",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SignResultResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad request (Invalid parameters)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/ca/sign_verification": {
+			"post": {
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"summary": "Verifies the signature and consent details.",
+				"description": "This endpoint verifies the signature and consent details provided in the request body.",
+				"tags": ["Certification Authority"],
+				"operationId": "getIA104",
+				"parameters": [
+					{
+						"in": "header",
+						"name": "x-api-tran-id",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[a-zA-Z0-9]{1,25}$",
+							"example": "anya123456SDFRES202503051"
+						},
+						"description": "Transaction ID for request tracking"
+					},
+					{
+						"in": "header",
+						"name": "Authorization",
+						"schema": {
+							"type": "string",
+							"example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+						},
+						"required": true,
+						"description": "Bearer token for authorization"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SignVerificationRequest"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Signature and consent verified successfully.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SignVerificationResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad request due to invalid parameters.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized request.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v2/mgmts/oauth/2.0/token": {
+			"post": {
+				"security": [],
+				"summary": "Management OAuth 2.0 token endpoint",
+				"description": "Generates a management access token using client credentials grant type",
+				"tags": ["Management"],
+				"operationId": "getSupport001",
+				"parameters": [
+					{
+						"in": "header",
+						"name": "x-api-tran-id",
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[a-zA-Z0-9]{1,25}$",
+							"example": "anya123456SDFRES202503051"
+						},
+						"required": true,
+						"description": "API transaction ID for request tracking"
+					},
+					{
+						"in": "header",
+						"name": "Authorization",
+						"schema": {
+							"type": "string",
+							"example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+						},
+						"required": true,
+						"description": "Bearer token for authorization"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/x-www-form-urlencoded": {
+							"schema": {
+								"type": "object",
+								"required": ["grant_type", "client_id", "client_secret", "scope"],
+								"properties": {
+									"grant_type": {
+										"type": "string",
+										"enum": ["client_credentials"],
+										"description": "OAuth 2.0 grant type (must be 'client_credentials')"
+									},
+									"client_id": {
+										"type": "string",
+										"description": "OAuth client ID"
+									},
+									"client_secret": {
+										"type": "string",
+										"description": "OAuth client secret"
+									},
+									"scope": {
+										"type": "string",
+										"enum": ["manage"],
+										"description": "API access scope (must be 'manage')"
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful token generation",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TokenResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid request parameters",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Invalid client credentials",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v2/mgmts/orgs": {
+			"get": {
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"summary": "Get organization list",
+				"description": "Retrieves a list of organizations",
+				"tags": ["Management"],
+				"operationId": "getSupport002",
+				"parameters": [
+					{
+						"in": "header",
+						"name": "x-api-tran-id",
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"description": "API transaction ID for request tracking"
+					},
+					{
+						"in": "query",
+						"name": "search_timestamp",
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"description": "Timestamp for search operation"
+					},
+					{
+						"in": "header",
+						"name": "Authorization",
+						"schema": {
+							"type": "string",
+							"example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+						},
+						"required": true,
+						"description": "Bearer token for authorization"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Successful retrieval of organization list",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"example": "0000"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"example": "Success"
+										},
+										"orgs": {
+											"type": "array",
+											"items": {
+												"$ref": "#/components/schemas/Organization"
+											}
+										}
+									}
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad request",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v2/bank/accounts/deposit/basic": {
+			"post": {
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"summary": "Get basic account information",
+				"description": "Retrieves basic account information",
+				"tags": ["Banking"],
+				"operationId": "getAccountsBasic",
+				"parameters": [
+					{
+						"in": "header",
+						"name": "x-api-tran-id",
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"description": "API transaction ID for request tracking"
+					},
+					{
+						"in": "header",
+						"name": "Authorization",
+						"schema": {
+							"type": "string",
+							"example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+						},
+						"required": true,
+						"description": "Bearer token for authorization"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"required": ["org_code", "account_num", "search_timestamp"],
+								"properties": {
+									"org_code": {
+										"type": "string",
+										"description": "Organization code",
+										"example": "bond123456"
+									},
+									"account_num": {
+										"type": "string",
+										"description": "Account number",
+										"example": "1234567890"
+									},
+									"next": {
+										"type": "string",
+										"description": "Pagination token",
+										"example": "0"
+									},
+									"search_timestamp": {
+										"type": "string",
+										"description": "Timestamp for search",
+										"example": "20250305120000"
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful retrieval of basic account information",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"example": "0000"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"example": "Success"
+										},
+										"account_info": {
+											"$ref": "#/components/schemas/AccountBasic"
+										}
+									}
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad request",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v2/bank/accounts/deposit/detail": {
+			"post": {
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"summary": "Get detailed account information",
+				"description": "Retrieves detailed account information",
+				"tags": ["Banking"],
+				"operationId": "getAccountsDetail",
+				"parameters": [
+					{
+						"in": "header",
+						"name": "x-api-tran-id",
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"description": "API transaction ID for request tracking"
+					},
+					{
+						"in": "header",
+						"name": "Authorization",
+						"schema": {
+							"type": "string",
+							"example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+						},
+						"required": true,
+						"description": "Bearer token for authorization"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"required": ["org_code", "account_num", "search_timestamp"],
+								"properties": {
+									"org_code": {
+										"type": "string",
+										"description": "Organization code",
+										"example": "bond123456"
+									},
+									"account_num": {
+										"type": "string",
+										"description": "Account number",
+										"example": "1234567890"
+									},
+									"next": {
+										"type": "string",
+										"description": "Pagination token",
+										"example": "0"
+									},
+									"search_timestamp": {
+										"type": "string",
+										"description": "Timestamp for search",
+										"example": "20250305120000"
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful retrieval of detailed account information",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"example": "0000"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"example": "Success"
+										},
+										"account_info": {
+											"$ref": "#/components/schemas/AccountDetail"
+										}
+									}
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad request",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"components": {
+		"securitySchemes": {
+			"bearerAuth": {
+				"type": "http",
+				"scheme": "bearer",
+				"bearerFormat": "JWT",
+				"description": "JWT Authorization header using the Bearer scheme"
+			}
+		},
+		"schemas": {
+			"SignRequest": {
+				"type": "object",
+				"required": ["sign_tx_id", "user_ci", "real_name", "phone_num", "request_title", "consent_list"],
+				"properties": {
+					"sign_tx_id": {
+						"type": "string",
+						"description": "Transaction ID for signing",
+						"example": "anya123456_certauth00_20250305120000_anyaserial00"
+					},
+					"user_ci": {
+						"type": "string",
+						"description": "Base64 encoded user identification",
+						"example": "RzFHZmwzUnQyWHM="
+					},
+					"real_name": {
+						"type": "string",
+						"description": "User's full name",
+						"example": "John Doe"
+					},
+					"phone_num": {
+						"type": "string",
+						"description": "User's phone number",
+						"example": "+821012345678"
+					},
+					"request_title": {
+						"type": "string",
+						"description": "Title of the request",
+						"example": "Request for Consent to Use Personal Information"
+					},
+					"device_code": {
+						"type": "string",
+						"description": "Device code (PC, MO, TB)",
+						"example": "PC"
+					},
+					"device_browser": {
+						"type": "string",
+						"description": "Browser code",
+						"example": "WB"
+					},
+					"return_app_scheme_url": {
+						"type": "string",
+						"description": "URL to return to after signing",
+						"example": "https://anya-bank.com/return"
+					},
+					"consent_type": {
+						"type": "string",
+						"description": "Type of consent",
+						"example": "1"
+					},
+					"consent_cnt": {
+						"type": "integer",
+						"description": "Number of consents",
+						"example": 3
+					},
+					"consent_list": {
+						"type": "array",
+						"description": "List of consents",
+						"items": {
+							"$ref": "#/components/schemas/Consent"
+						}
+					}
+				}
+			},
+			"Consent": {
+				"type": "object",
+				"required": ["tx_id", "consent_title", "consent", "consent_len"],
+				"properties": {
+					"tx_id": {
+						"type": "string",
+						"description": "Transaction ID for the consent",
+						"example": "MD_anya123456_bond123456_RA20215001_certauth00_20250305120000_XXAB00490001"
+					},
+					"consent_title": {
+						"type": "string",
+						"description": "Title of the consent",
+						"example": "Consent Request for Transmission"
+					},
+					"consent": {
+						"type": "string",
+						"description": "Base64 encoded consent content",
+						"example": "Y29uc2VudC0wMDE="
+					},
+					"consent_len": {
+						"type": "integer",
+						"description": "Length of the consent content",
+						"example": 12
+					}
+				}
+			},
+			"SignResponse": {
+				"type": "object",
+				"required": ["rsp_code", "rsp_msg", "cert_tx_id"],
+				"properties": {
+					"rsp_code": {
+						"type": "string",
+						"description": "Response code",
+						"example": "0000"
+					},
+					"rsp_msg": {
+						"type": "string",
+						"description": "Response message",
+						"example": "Electronic signature request successful, cert_tx_id has been provided."
+					},
+					"sign_ios_app_scheme_url": {
+						"type": "string",
+						"description": "iOS app URL scheme for signing",
+						"example": "mydataauth://auth?tx_id=ORG2025001"
+					},
+					"sign_aos_app_scheme_url": {
+						"type": "string",
+						"description": "Android app URL scheme for signing",
+						"example": "mydataauth://auth?tx_id=ORG2025001"
+					},
+					"sign_web_url": {
+						"type": "string",
+						"description": "Web URL for signing",
+						"example": "https://mydataauth.com/auth?tx_id=ORG2025001"
+					},
+					"cert_tx_id": {
+						"type": "string",
+						"description": "Certificate transaction ID",
+						"example": "CERT2025001"
+					}
+				}
+			},
+			"SignResultRequest": {
+				"type": "object",
+				"required": ["cert_tx_id", "sign_tx_id"],
+				"properties": {
+					"cert_tx_id": {
+						"type": "string",
+						"description": "Certificate transaction ID",
+						"example": "CERT2025001"
+					},
+					"sign_tx_id": {
+						"type": "string",
+						"description": "Sign transaction ID",
+						"example": "anya123456_certauth00_20250305120000_anyaserial00"
+					}
+				}
+			},
+			"SignResultResponse": {
+				"type": "object",
+				"required": ["rsp_code", "rsp_msg", "signed_consent_list"],
+				"properties": {
+					"rsp_code": {
+						"type": "string",
+						"description": "Response code",
+						"example": "0000"
+					},
+					"rsp_msg": {
+						"type": "string",
+						"description": "Response message",
+						"example": "Success"
+					},
+					"signed_consent_cnt": {
+						"type": "integer",
+						"description": "Count of signed consents",
+						"example": 3
+					},
+					"signed_consent_list": {
+						"type": "array",
+						"description": "List of signed consents",
+						"items": {
+							"$ref": "#/components/schemas/SignedConsent"
+						}
+					}
+				}
+			},
+			"SignedConsent": {
+				"type": "object",
+				"required": ["tx_id", "signed_consent", "signed_consent_len"],
+				"properties": {
+					"tx_id": {
+						"type": "string",
+						"description": "Transaction ID",
+						"example": "MD_anya123456_bond123456_RA20215001_certauth00_20250305120000_XXAB00490001"
+					},
+					"signed_consent": {
+						"type": "string",
+						"description": "Signed consent data (base64 encoded)",
+						"example": "aHR0cHM6Ly9leGFtcGxlLmNvbQ=="
+					},
+					"signed_consent_len": {
+						"type": "integer",
+						"description": "Length of signed consent data",
+						"example": 24
+					},
+					"user_id": {
+						"type": "string",
+						"description": "User ID",
+						"example": "user@example.com"
+					},
+					"certificate_id": {
+						"type": "string",
+						"description": "Certificate ID",
+						"example": "CERT-123456"
+					}
+				}
+			},
+			"SignVerificationRequest": {
+				"type": "object",
+				"required": [
+					"tx_id",
+					"cert_tx_id",
+					"signed_consent_len",
+					"signed_consent",
+					"consent_type",
+					"consent_len",
+					"consent"
+				],
+				"properties": {
+					"tx_id": {
+						"type": "string",
+						"description": "Transaction ID",
+						"example": "MD_anya123456_bond123456_RA20215001_certauth00_20250305120000_XXAB00490001"
+					},
+					"cert_tx_id": {
+						"type": "string",
+						"description": "Certificate transaction ID",
+						"example": "CERT2025001"
+					},
+					"signed_consent_len": {
+						"type": "integer",
+						"description": "Length of the signed consent",
+						"example": 24
+					},
+					"signed_consent": {
+						"type": "string",
+						"description": "Signed consent (base64 encoded)",
+						"example": "aHR0cHM6Ly9leGFtcGxlLmNvbQ=="
+					},
+					"consent_type": {
+						"type": "string",
+						"description": "Type of consent",
+						"example": "1"
+					},
+					"consent_len": {
+						"type": "integer",
+						"description": "Length of the consent",
+						"example": 12
+					},
+					"consent": {
+						"type": "string",
+						"description": "Consent (base64 encoded)",
+						"example": "Y29uc2VudC0wMDE="
+					}
+				}
+			},
+			"SignVerificationResponse": {
+				"type": "object",
+				"required": ["tx_id", "rsp_code", "rsp_msg", "result"],
+				"properties": {
+					"tx_id": {
+						"type": "string",
+						"description": "Transaction ID",
+						"example": "MD_anya123456_bond123456_RA20215001_certauth00_20250305120000_XXAB00490001"
+					},
+					"rsp_code": {
+						"type": "string",
+						"description": "Response code",
+						"example": "0000"
+					},
+					"rsp_msg": {
+						"type": "string",
+						"description": "Response message",
+						"example": "Verification successful"
+					},
+					"result": {
+						"type": "boolean",
+						"description": "Result of the verification",
+						"example": true
+					},
+					"user_ci": {
+						"type": "string",
+						"description": "User CI information (base64 encoded)",
+						"example": "RzFHZmwzUnQyWHM="
+					}
+				}
+			},
+			"TokenResponse": {
+				"type": "object",
+				"required": ["rsp_code", "rsp_msg", "token_type", "access_token", "expires_in", "scope"],
+				"properties": {
+					"rsp_code": {
+						"type": "string",
+						"description": "Response code",
+						"example": "0000"
+					},
+					"rsp_msg": {
+						"type": "string",
+						"description": "Response message",
+						"example": "Success"
+					},
+					"token_type": {
+						"type": "string",
+						"description": "Token type",
+						"example": "Bearer"
+					},
+					"access_token": {
+						"type": "string",
+						"description": "Access token",
+						"example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+					},
+					"expires_in": {
+						"type": "integer",
+						"description": "Token expiration time in seconds",
+						"example": 3600
+					},
+					"scope": {
+						"type": "string",
+						"description": "Token scope",
+						"example": "ca"
+					}
+				}
+			},
+			"Organization": {
+				"type": "object",
+				"properties": {
+					"org_code": {
+						"type": "string",
+						"description": "Organization code",
+						"example": "anya123456",
+						"pattern": "^[a-zA-Z0-9]{1,25}$"
+					},
+					"org_name": {
+						"type": "string",
+						"description": "Organization name",
+						"example": "Anya Bank",
+						"pattern": "^[a-zA-Z0-9]{1,50}$"
+					},
+					"org_status": {
+						"type": "string",
+						"description": "Organization status",
+						"example": "active",
+						"enum": ["active", "inactive"]
+					},
+					"created_at": {
+						"type": "string",
+						"format": "date-time",
+						"description": "Creation timestamp",
+						"example": "2025-01-01T00:00:00Z",
+						"pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+					}
+				}
+			},
+			"AccountBasic": {
+				"type": "object",
+				"properties": {
+					"account_num": {
+						"type": "string",
+						"description": "Account number",
+						"example": "1234567890",
+						"pattern": "^[0-9]{10}$"
+					},
+					"account_type": {
+						"type": "string",
+						"description": "Account type",
+						"example": "savings"
+					},
+					"account_status": {
+						"type": "string",
+						"description": "Account status",
+						"example": "active"
+					},
+					"currency_code": {
+						"type": "string",
+						"description": "Currency code",
+						"example": "USD"
+					},
+					"balance": {
+						"type": "number",
+						"format": "double",
+						"description": "Account balance",
+						"example": 5000.75
+					}
+				}
+			},
+			"AccountDetail": {
+				"type": "object",
+				"properties": {
+					"account_num": {
+						"type": "string",
+						"description": "Account number",
+						"example": "1234567890"
+					},
+					"account_type": {
+						"type": "string",
+						"description": "Account type",
+						"example": "savings"
+					},
+					"account_status": {
+						"type": "string",
+						"description": "Account status",
+						"example": "active"
+					},
+					"currency_code": {
+						"type": "string",
+						"description": "Currency code",
+						"example": "USD"
+					},
+					"balance": {
+						"type": "number",
+						"format": "double",
+						"description": "Account balance",
+						"example": 5000.75
+					},
+					"available_balance": {
+						"type": "number",
+						"format": "double",
+						"description": "Available balance",
+						"example": 4800.25
+					},
+					"interest_rate": {
+						"type": "number",
+						"format": "double",
+						"description": "Interest rate",
+						"example": 0.25
+					},
+					"created_at": {
+						"type": "string",
+						"format": "date-time",
+						"description": "Account creation date",
+						"example": "2024-01-15T00:00:00Z"
+					},
+					"last_transaction_date": {
+						"type": "string",
+						"format": "date-time",
+						"description": "Last transaction date",
+						"example": "2025-03-01T15:30:45Z"
+					}
+				}
+			},
+			"ErrorResponse": {
+				"type": "object",
+				"required": ["code", "message"],
+				"properties": {
+					"code": {
+						"type": "string",
+						"description": "Error code",
+						"example": "ERR_400"
+					},
+					"message": {
+						"type": "string",
+						"description": "Error message",
+						"example": "Invalid request parameters"
+					}
+				}
+			}
+		}
+	}
+}
