@@ -1,5 +1,6 @@
 import { Redis } from 'ioredis';
 import { LogEntry } from './types';
+import * as fs from 'fs';
 
 /**
  * Advanced Rate Limiting Implementation
@@ -136,9 +137,9 @@ const defaultConfig: RateLimitConfig = {
 };
 
 export class RateLimiter {
-	private config: RateLimitConfig;
-	private inMemoryStore: Map<string, number[]>;
-	private redisClient?: Redis;
+	private readonly config: RateLimitConfig;
+	private readonly inMemoryStore: Map<string, number[]>;
+	private readonly redisClient?: Redis;
 
 	/**
 	 * Creates a new RateLimiter instance
@@ -449,8 +450,7 @@ async function logRateLimitViolation(entry: LogEntry, result: RateLimitResult): 
 
 	// Log to file or send to monitoring system
 	console.log('[RATE LIMIT VIOLATION]', JSON.stringify(logRecord));
-
-	// TODO: Implement alerting for suspicious patterns
+	fs.appendFileSync('rate_limit_violations.log', JSON.stringify(logRecord) + '\n');
 }
 
 /**
