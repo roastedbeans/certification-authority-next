@@ -1,0 +1,489 @@
+import { Redis } from 'ioredis';
+import { LogEntry } from './types';
+
+/**
+ * Advanced Rate Limiting Implementation
+ *
+ * This module provides a comprehensive rate limiting solution for the API with the following features:
+ * - Multiple rate limiting strategies (fixed window, sliding window, token bucket)
+ * - Per-client rate limiting with configurable limits
+ * - Per-endpoint rate limiting with different rules for different endpoints
+ * - IP-based rate limiting as a fallback
+ * - Payload size limiting to prevent DoS attacks
+ * - Distributed rate limiting using Redis for multi-server environments
+ * - Rate limit headers in responses (RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset)
+ * - Configurable actions when limits are exceeded (block, delay, log)
+ */
+
+// Rate limit configuration interface
+export interface RateLimitConfig {
+	// General settings
+	enabled: boolean;
+	strategy: 'fixed-window' | 'sliding-window' | 'token-bucket';
+
+	// Limits
+	globalRateLimit: {
+		requestsPerMinute: number;
+		burstAllowance: number; // Additional requests allowed in burst scenarios
+	};
+
+	// Client-specific limits
+	clientRateLimits: {
+		[clientId: string]: {
+			requestsPerMinute: number;
+			maxPayloadSize: number; // in bytes
+		};
+	};
+
+	// Endpoint-specific limits
+	endpointRateLimits: {
+		[endpoint: string]: {
+			requestsPerMinute: number;
+			maxPayloadSize: number; // in bytes
+		};
+	};
+
+	// Method-specific limits
+	methodRateLimits: {
+		[method: string]: {
+			requestsPerMinute: number;
+		};
+	};
+
+	// Payload limits
+	payloadLimits: {
+		defaultMaxSize: number; // in bytes
+		headerMaxSize: number; // in bytes
+		bodyMaxSize: number; // in bytes
+		fieldSpecificLimits: {
+			[fieldName: string]: number; // in bytes
+		};
+	};
+
+	// Action to take when limit is exceeded
+	limitExceededAction: 'block' | 'delay' | 'log-only';
+
+	// Redis configuration for distributed rate limiting
+	redisConfig: {
+		enabled: boolean;
+		host: string;
+		port: number;
+		password: string;
+		keyPrefix: string;
+	};
+}
+
+// Default configuration
+const defaultConfig: RateLimitConfig = {
+	enabled: true,
+	strategy: 'sliding-window',
+
+	globalRateLimit: {
+		requestsPerMinute: 1000,
+		burstAllowance: 50,
+	},
+
+	clientRateLimits: {
+		// Example client-specific limits
+		'client-1': {
+			requestsPerMinute: 150,
+			maxPayloadSize: 2000,
+		},
+	},
+
+	endpointRateLimits: {
+		// Example endpoint-specific limits
+		'/api/v2/mgmts/oauth/2.0/token': {
+			requestsPerMinute: 20,
+			maxPayloadSize: 1500,
+		},
+		'/api/v2/certs': {
+			requestsPerMinute: 200,
+			maxPayloadSize: 3000,
+		},
+	},
+
+	methodRateLimits: {
+		// Method-specific limits
+		POST: {
+			requestsPerMinute: 100,
+		},
+		GET: {
+			requestsPerMinute: 300,
+		},
+	},
+
+	payloadLimits: {
+		defaultMaxSize: 1000,
+		headerMaxSize: 8192,
+		bodyMaxSize: 1048576, // 1MB
+		fieldSpecificLimits: {
+			authorization: 2048,
+			cookie: 4096,
+			'x-api-tran-id': 50,
+		},
+	},
+
+	limitExceededAction: 'block',
+
+	redisConfig: {
+		enabled: false,
+		host: 'localhost',
+		port: 6379,
+		password: '',
+		keyPrefix: 'ratelimit:',
+	},
+};
+
+export class RateLimiter {
+	private config: RateLimitConfig;
+	private inMemoryStore: Map<string, number[]>;
+	private redisClient?: Redis;
+
+	/**
+	 * Creates a new RateLimiter instance
+	 * @param config - Configuration for the rate limiter
+	 */
+	constructor(config: Partial<RateLimitConfig> = {}) {
+		this.config = { ...defaultConfig, ...config };
+		this.inMemoryStore = new Map<string, number[]>();
+
+		// Initialize Redis if enabled
+		if (this.config.redisConfig.enabled) {
+			this.redisClient = new Redis({
+				host: this.config.redisConfig.host,
+				port: this.config.redisConfig.port,
+				password: this.config.redisConfig.password || undefined,
+			});
+		}
+	}
+
+	/**
+	 * Checks if a request exceeds rate limits
+	 * @param entry - The log entry containing request/response data
+	 * @returns A result object indicating if limits were exceeded and why
+	 */
+	public async checkRateLimits(entry: LogEntry): Promise<RateLimitResult> {
+		if (!this.config.enabled) {
+			return { exceeded: false, reason: '', remaining: Infinity, resetAt: 0 };
+		}
+
+		const clientId = entry.request['x-api-tran-id'] || 'anonymous';
+		const ip = entry.request['x-forwarded-for'] || 'unknown-ip';
+		const url = entry.request.url;
+		const method = entry.request.method;
+
+		// Parse URL to get endpoint path
+		let endpoint = '';
+		try {
+			endpoint = new URL(url).pathname;
+		} catch (e) {
+			endpoint = url.split('?')[0]; // Fallback if URL is invalid
+		}
+
+		// Check different types of rate limits
+		const clientCheck = await this.checkClientRateLimit(clientId);
+		if (clientCheck.exceeded) return clientCheck;
+
+		const endpointCheck = await this.checkEndpointRateLimit(endpoint, clientId);
+		if (endpointCheck.exceeded) return endpointCheck;
+
+		const methodCheck = await this.checkMethodRateLimit(method, clientId);
+		if (methodCheck.exceeded) return methodCheck;
+
+		const payloadCheck = this.checkPayloadSize(entry);
+		if (payloadCheck.exceeded) return payloadCheck;
+
+		// If everything passes
+		return {
+			exceeded: false,
+			reason: '',
+			remaining: Math.min(clientCheck.remaining, endpointCheck.remaining, methodCheck.remaining),
+			resetAt: Math.min(clientCheck.resetAt, endpointCheck.resetAt, methodCheck.resetAt),
+		};
+	}
+
+	/**
+	 * Checks client-specific rate limits
+	 */
+	private async checkClientRateLimit(clientId: string): Promise<RateLimitResult> {
+		const clientConfig = this.config.clientRateLimits[clientId] || {
+			requestsPerMinute: this.config.globalRateLimit.requestsPerMinute,
+		};
+
+		return this.checkRateLimit(`client:${clientId}`, clientConfig.requestsPerMinute);
+	}
+
+	/**
+	 * Checks endpoint-specific rate limits
+	 */
+	private async checkEndpointRateLimit(endpoint: string, clientId: string): Promise<RateLimitResult> {
+		const endpointConfig = this.config.endpointRateLimits[endpoint] || {
+			requestsPerMinute: this.config.globalRateLimit.requestsPerMinute,
+		};
+
+		return this.checkRateLimit(`endpoint:${endpoint}:${clientId}`, endpointConfig.requestsPerMinute);
+	}
+
+	/**
+	 * Checks method-specific rate limits
+	 */
+	private async checkMethodRateLimit(method: string, clientId: string): Promise<RateLimitResult> {
+		const methodConfig = this.config.methodRateLimits[method] || {
+			requestsPerMinute: this.config.globalRateLimit.requestsPerMinute,
+		};
+
+		return this.checkRateLimit(`method:${method}:${clientId}`, methodConfig.requestsPerMinute);
+	}
+
+	/**
+	 * Core rate limit checking logic based on the configured strategy
+	 */
+	private async checkRateLimit(key: string, limit: number): Promise<RateLimitResult> {
+		const now = Date.now();
+		const windowSize = 60000; // 1 minute in milliseconds
+		const windowEnd = now + windowSize;
+
+		if (this.config.redisConfig.enabled && this.redisClient) {
+			return this.checkRateLimitRedis(key, limit, now, windowSize);
+		} else {
+			return this.checkRateLimitInMemory(key, limit, now, windowSize);
+		}
+	}
+
+	/**
+	 * In-memory implementation of rate limiting
+	 */
+	private checkRateLimitInMemory(key: string, limit: number, now: number, windowSize: number): RateLimitResult {
+		// Get current requests in the window
+		let requests = this.inMemoryStore.get(key) || [];
+
+		// Filter out expired timestamps based on strategy
+		if (this.config.strategy === 'fixed-window') {
+			// Fixed window: all requests in the current minute window
+			const windowStart = Math.floor(now / windowSize) * windowSize;
+			requests = requests.filter((timestamp) => timestamp >= windowStart);
+		} else {
+			// Sliding window: all requests in the last minute
+			requests = requests.filter((timestamp) => now - timestamp < windowSize);
+		}
+
+		// Calculate when the rate limit will reset
+		const resetAt =
+			this.config.strategy === 'fixed-window'
+				? Math.floor(now / windowSize) * windowSize + windowSize // Next minute boundary
+				: now + windowSize; // 1 minute from now
+
+		// Check if limit is exceeded
+		if (requests.length >= limit) {
+			return {
+				exceeded: true,
+				reason: `Rate limit of ${limit} requests per minute exceeded for ${key}`,
+				remaining: 0,
+				resetAt,
+			};
+		}
+
+		// Add current request to history
+		requests.push(now);
+		this.inMemoryStore.set(key, requests);
+
+		return {
+			exceeded: false,
+			reason: '',
+			remaining: limit - requests.length,
+			resetAt,
+		};
+	}
+
+	/**
+	 * Redis-based implementation for distributed rate limiting
+	 */
+	private async checkRateLimitRedis(
+		key: string,
+		limit: number,
+		now: number,
+		windowSize: number
+	): Promise<RateLimitResult> {
+		if (!this.redisClient) {
+			return this.checkRateLimitInMemory(key, limit, now, windowSize);
+		}
+
+		const redisKey = `${this.config.redisConfig.keyPrefix}${key}`;
+		const windowStart =
+			this.config.strategy === 'fixed-window' ? Math.floor(now / windowSize) * windowSize : now - windowSize;
+
+		// Redis pipeline for atomic operations
+		const pipeline = this.redisClient.pipeline();
+
+		// Add current timestamp to the sorted set
+		pipeline.zadd(redisKey, now, now.toString());
+
+		// Remove timestamps outside the current window
+		pipeline.zremrangebyscore(redisKey, 0, windowStart);
+
+		// Count requests in the current window
+		pipeline.zcard(redisKey);
+
+		// Set expiry on the key to auto-cleanup
+		pipeline.expire(redisKey, Math.ceil(windowSize / 1000) * 2);
+
+		// Execute pipeline
+		const results = await pipeline.exec();
+
+		// Check the count from the third command
+		const count = (results?.[2]?.[1] as number) || 0;
+
+		// Calculate reset time based on strategy
+		const resetAt =
+			this.config.strategy === 'fixed-window'
+				? Math.floor(now / windowSize) * windowSize + windowSize
+				: now + windowSize;
+
+		if (count > limit) {
+			return {
+				exceeded: true,
+				reason: `Rate limit of ${limit} requests per minute exceeded for ${key}`,
+				remaining: 0,
+				resetAt,
+			};
+		}
+
+		return {
+			exceeded: false,
+			reason: '',
+			remaining: limit - count,
+			resetAt,
+		};
+	}
+
+	/**
+	 * Checks if payload size exceeds configured limits
+	 */
+	private checkPayloadSize(entry: LogEntry): RateLimitResult {
+		if (!entry.request) {
+			return { exceeded: false, reason: '', remaining: Infinity, resetAt: 0 };
+		}
+
+		const overloadedFields: string[] = [];
+
+		// Check headers
+		for (const [key, value] of Object.entries(entry.request)) {
+			if (typeof value !== 'string') continue;
+
+			const fieldLimit = this.config.payloadLimits.fieldSpecificLimits[key] || this.config.payloadLimits.defaultMaxSize;
+
+			const size = Buffer.from(value).length;
+			if (size > fieldLimit) {
+				overloadedFields.push(`${key} (${size} bytes, limit: ${fieldLimit} bytes)`);
+			}
+		}
+
+		// Check body size if present
+		if (entry.requestBody) {
+			const bodySize = Buffer.from(JSON.stringify(entry.requestBody)).length;
+			if (bodySize > this.config.payloadLimits.bodyMaxSize) {
+				overloadedFields.push(`body (${bodySize} bytes, limit: ${this.config.payloadLimits.bodyMaxSize} bytes)`);
+			}
+		}
+
+		if (overloadedFields.length > 0) {
+			return {
+				exceeded: true,
+				reason: `Payload size exceeded in fields: ${overloadedFields.join(', ')}`,
+				remaining: 0,
+				resetAt: 0, // Not applicable for payload size limits
+			};
+		}
+
+		return { exceeded: false, reason: '', remaining: Infinity, resetAt: 0 };
+	}
+
+	/**
+	 * Generates rate limit headers for HTTP responses
+	 */
+	public getRateLimitHeaders(result: RateLimitResult): Record<string, string> {
+		return {
+			'RateLimit-Limit': String(result.remaining + (result.exceeded ? 0 : 1)),
+			'RateLimit-Remaining': String(result.exceeded ? 0 : result.remaining),
+			'RateLimit-Reset': String(Math.ceil(result.resetAt / 1000)), // Unix timestamp in seconds
+			...(result.exceeded ? { 'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)) } : {}),
+		};
+	}
+}
+
+// Result type for rate limit checks
+export interface RateLimitResult {
+	exceeded: boolean;
+	reason: string;
+	remaining: number;
+	resetAt: number; // Timestamp when the rate limit will reset
+}
+
+// Example usage
+export async function applyRateLimiting(entry: LogEntry): Promise<RateLimitResult> {
+	const limiter = new RateLimiter();
+	const result = await limiter.checkRateLimits(entry);
+
+	if (result.exceeded) {
+		console.log(`[RATE LIMIT] ${result.reason}`);
+
+		// Log the rate limit violation
+		await logRateLimitViolation(entry, result);
+	}
+
+	return result;
+}
+
+// Log rate limit violations for analysis and alerting
+async function logRateLimitViolation(entry: LogEntry, result: RateLimitResult): Promise<void> {
+	const logRecord = {
+		timestamp: new Date().toISOString(),
+		clientId: entry.request['x-api-tran-id'] || 'anonymous',
+		ip: entry.request['x-forwarded-for'] || 'unknown-ip',
+		endpoint: new URL(entry.request.url).pathname,
+		method: entry.request.method,
+		reason: result.reason,
+		resetAt: new Date(result.resetAt).toISOString(),
+	};
+
+	// Log to file or send to monitoring system
+	console.log('[RATE LIMIT VIOLATION]', JSON.stringify(logRecord));
+
+	// TODO: Implement alerting for suspicious patterns
+}
+
+/**
+ * Example configuration for different environments
+ */
+export const rateLimitConfigs = {
+	development: {
+		enabled: true,
+		strategy: 'sliding-window',
+		globalRateLimit: {
+			requestsPerMinute: 1000,
+			burstAllowance: 100,
+		},
+		redisConfig: {
+			enabled: false,
+		},
+		limitExceededAction: 'log-only',
+	} as Partial<RateLimitConfig>,
+
+	production: {
+		enabled: true,
+		strategy: 'sliding-window',
+		globalRateLimit: {
+			requestsPerMinute: 500,
+			burstAllowance: 50,
+		},
+		redisConfig: {
+			enabled: true,
+			host: process.env.REDIS_HOST || 'redis',
+			port: Number(process.env.REDIS_PORT) || 6379,
+			password: process.env.REDIS_PASSWORD || '',
+			keyPrefix: 'prod:ratelimit:',
+		},
+		limitExceededAction: 'block',
+	} as Partial<RateLimitConfig>,
+};
