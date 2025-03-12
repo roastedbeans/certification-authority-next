@@ -80,37 +80,65 @@ const defaultConfig: RateLimitConfig = {
 	strategy: 'sliding-window',
 
 	globalRateLimit: {
-		requestsPerMinute: 1000,
+		requestsPerMinute: 500,
 		burstAllowance: 50,
 	},
 
 	clientRateLimits: {
-		// Example client-specific limits
-		'client-1': {
+		// Client-specific limits based on OrgCode
+		anya123456: {
 			requestsPerMinute: 150,
+			maxPayloadSize: 2500,
+		},
+		bond123456: {
+			requestsPerMinute: 120,
 			maxPayloadSize: 2000,
 		},
 	},
 
 	endpointRateLimits: {
-		// Example endpoint-specific limits
+		// Authentication endpoints - stricter limits to prevent abuse
 		'/api/v2/mgmts/oauth/2.0/token': {
-			requestsPerMinute: 20,
-			maxPayloadSize: 1500,
+			requestsPerMinute: 10,
+			maxPayloadSize: 1000,
 		},
-		'/api/v2/certs': {
-			requestsPerMinute: 200,
+		'/api/oauth/2.0/token': {
+			requestsPerMinute: 10,
+			maxPayloadSize: 1000,
+		},
+		// Certificate management endpoints
+		'/api/ca/sign_request': {
+			requestsPerMinute: 20,
+			maxPayloadSize: 5000,
+		},
+		'/api/ca/sign_result': {
+			requestsPerMinute: 20,
 			maxPayloadSize: 3000,
+		},
+		'/api/ca/sign_verification': {
+			requestsPerMinute: 30,
+			maxPayloadSize: 3000,
+		},
+		// Organization management endpoints
+		'/api/v2/mgmts/orgs': {
+			requestsPerMinute: 30,
+			maxPayloadSize: 2000,
 		},
 	},
 
 	methodRateLimits: {
 		// Method-specific limits
 		POST: {
-			requestsPerMinute: 100,
+			requestsPerMinute: 60,
 		},
 		GET: {
-			requestsPerMinute: 300,
+			requestsPerMinute: 120,
+		},
+		PUT: {
+			requestsPerMinute: 40,
+		},
+		DELETE: {
+			requestsPerMinute: 20,
 		},
 	},
 
@@ -121,7 +149,10 @@ const defaultConfig: RateLimitConfig = {
 		fieldSpecificLimits: {
 			authorization: 2048,
 			cookie: 4096,
-			'x-api-tran-id': 50,
+			'x-api-tran-id': 50, // Based on OpenAPI spec: maxLength 25 characters
+			client_id: 100, // Based on OpenAPI spec: maxLength 50 characters
+			client_secret: 100, // Based on OpenAPI spec: maxLength 50 characters
+			scope: 12, // Based on OpenAPI spec: maxLength 6 characters
 		},
 	},
 

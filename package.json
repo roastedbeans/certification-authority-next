@@ -17,7 +17,9 @@
 		"specification": "ts-node scripts/detectionSpecification.ts",
 		"signature": "ts-node scripts/detectionSignature.ts",
 		"analysis": "ts-node scripts/analysis.ts",
-		"detection": "ts-node scripts/detectionSpecification.ts"
+		"detection": "ts-node scripts/detectionSpecification.ts",
+		"ratelimit": "ts-node scripts/rateLimitAll.ts",
+		"ratelimit:analyze": "ts-node scripts/rateLimitAll.ts ./public/requests_responses.txt"
 	},
 	"dependencies": {
 		"@faker-js/faker": "^9.4.0",
