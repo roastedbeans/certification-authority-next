@@ -3,11 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import { generateTxtFile } from './generateLog';
 
-const filePath = path.join(process.cwd(), '/public/requests_responses.txt');
+// const filePath = path.join(process.cwd(), '/public/requests_responses.txt');
 const csvFIlePath = path.join(process.cwd(), '/public/ca_formatted_logs.csv');
 const csvFilePath = path.resolve(csvFIlePath);
 // Define CSV headers
 const csvHeaders = [
+	{ id: 'timestamp', title: 'timestamp' },
 	{ id: 'attack_type', title: 'attack.type' },
 	{ id: 'request_url', title: 'request.url' },
 	{ id: 'request_method', title: 'request.method' },
@@ -52,37 +53,39 @@ export const logger = async (
 		append: true, // Append to the existing file
 	});
 
-	const requestContent = {
-		'attack-type': req?.headers?.['attack-type'] || '',
-		url: req?.url || '',
-		method: req?.method || '',
-		authorization: req?.headers?.authorization || '',
-		'user-agent': req?.headers?.['user-agent'] || '',
-		'x-api-tran-id': req?.headers?.['x-api-tran-id'] || '',
-		'x-api-type': req?.headers?.['x-api-type'] || '',
-		'x-csrf-token': req?.headers?.['x-csrf-token'] || '',
-		cookie: req?.headers?.cookie || '',
-		'content-type': req?.headers?.['content-type'] || '',
-		'set-cookie': req?.headers?.['set-cookie'] || '',
-		'content-length': req?.headers?.['content-length'] || '',
-		body: JSON.parse(requestBody),
-	};
+	// const requestContent = {
+	// 	timestamp: new Date().toISOString(),
+	// 	'attack-type': req?.headers?.['attack-type'] || '',
+	// 	url: req?.url || '',
+	// 	method: req?.method || '',
+	// 	authorization: req?.headers?.authorization || '',
+	// 	'user-agent': req?.headers?.['user-agent'] || '',
+	// 	'x-api-tran-id': req?.headers?.['x-api-tran-id'] || '',
+	// 	'x-api-type': req?.headers?.['x-api-type'] || '',
+	// 	'x-csrf-token': req?.headers?.['x-csrf-token'] || '',
+	// 	cookie: req?.headers?.cookie || '',
+	// 	'content-type': req?.headers?.['content-type'] || '',
+	// 	'set-cookie': req?.headers?.['set-cookie'] || '',
+	// 	'content-length': req?.headers?.['content-length'] || '',
+	// 	body: JSON.parse(requestBody),
+	// };
 
-	const responseContent = {
-		'x-api-tran-id': req?.headers?.['x-api-tran-id'] || '',
-		body: JSON.parse(responseBody),
-	};
+	// const responseContent = {
+	// 	'x-api-tran-id': req?.headers?.['x-api-tran-id'] || '',
+	// 	body: JSON.parse(responseBody),
+	// };
 
-	const stringRequestContent = JSON.stringify(requestContent);
-	const stringResponseContent = JSON.stringify(responseContent);
+	// const stringRequestContent = JSON.stringify(requestContent);
+	// const stringResponseContent = JSON.stringify(responseContent);
 
-	generateTxtFile(filePath, {
-		request: stringRequestContent,
-		response: stringResponseContent,
-	});
+	// generateTxtFile(filePath, {
+	// 	request: stringRequestContent,
+	// 	response: stringResponseContent,
+	// });
 
 	await csvWriter.writeRecords([
 		{
+			timestamp: new Date().toISOString(),
 			attack_type: req?.headers?.['attack-type'] || '',
 			request_url: req?.url || '',
 			request_method: req?.method || '',

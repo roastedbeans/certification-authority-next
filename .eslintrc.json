@@ -1,4 +1,6 @@
 {
 	"extends": ["next/core-web-vitals", "next/typescript"],
-	"eslint.rules.customizations": [{ "rule": "*", "severity": "warn" }]
+	"rules": {
+		// Add any custom rules here
+	}
 }

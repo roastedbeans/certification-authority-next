@@ -1,0 +1,263 @@
+'use server';
+
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs/promises';
+import path from 'path';
+
+const execPromise = promisify(exec);
+
+// Path helpers
+const publicPath = path.join(process.cwd(), 'public');
+const logsPath = path.join(process.cwd(), 'logs');
+const scriptsPath = path.join(process.cwd(), 'scripts');
+
+// Ensure directories exist
+async function ensureDirectories() {
+	try {
+		await fs.mkdir(publicPath, { recursive: true });
+		await fs.mkdir(logsPath, { recursive: true });
+	} catch (error) {
+		console.error('Error ensuring directories exist:', error);
+	}
+}
+
+// Call once when server starts
+ensureDirectories();
+
+export interface DetectionResult {
+	success: boolean;
+	message: string;
+	data?: any;
+	error?: string;
+}
+
+export interface LogEntry {
+	timestamp: string;
+	detectionType: string;
+	detected: boolean | string;
+	reason: string;
+	request: string;
+	response: string;
+}
+
+export async function runSignatureDetection(): Promise<DetectionResult> {
+	try {
+		// Run with a timeout to prevent hanging
+		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionSignature.ts', {
+			timeout: 30000,
+			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
+		});
+
+		return {
+			success: true,
+			message: 'Signature-based detection completed successfully',
+			data: stdout,
+		};
+	} catch (error: any) {
+		console.error('Error running signature detection:', error);
+		return {
+			success: false,
+			message: 'Signature-based detection failed',
+			error: error.message,
+		};
+	}
+}
+
+export async function runSpecificationDetection(): Promise<DetectionResult> {
+	try {
+		// Run with a timeout to prevent hanging
+		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionSpecification.ts', {
+			timeout: 30000,
+			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
+		});
+
+		return {
+			success: true,
+			message: 'Specification-based detection completed successfully',
+			data: stdout,
+		};
+	} catch (error: any) {
+		console.error('Error running specification detection:', error);
+		return {
+			success: false,
+			message: 'Specification-based detection failed',
+			error: error.message,
+		};
+	}
+}
+
+export async function runHybridDetection(): Promise<DetectionResult> {
+	try {
+		// Run with a timeout to prevent hanging
+		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionHybrid.ts', {
+			timeout: 30000,
+			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
+		});
+
+		return {
+			success: true,
+			message: 'Hybrid detection completed successfully',
+			data: stdout,
+		};
+	} catch (error: any) {
+		console.error('Error running hybrid detection:', error);
+		return {
+			success: false,
+			message: 'Hybrid detection failed',
+			error: error.message,
+		};
+	}
+}
+
+export async function runAnalysis(): Promise<DetectionResult> {
+	try {
+		// Run with a timeout to prevent hanging
+		const { stdout, stderr } = await execPromise('npx tsx scripts/analysis.ts', {
+			timeout: 30000,
+			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
+		});
+
+		return {
+			success: true,
+			message: 'Analysis completed successfully',
+			data: stdout,
+		};
+	} catch (error: any) {
+		console.error('Error running analysis:', error);
+		return {
+			success: false,
+			message: 'Analysis failed',
+			error: error.message,
+		};
+	}
+}
+
+export async function runRateLimitDetection(): Promise<DetectionResult> {
+	try {
+		// Run with a timeout to prevent hanging
+		const { stdout, stderr } = await execPromise('npx tsx scripts/rateLimitAll.ts', {
+			timeout: 30000,
+			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
+		});
+
+		return {
+			success: true,
+			message: 'Rate limit detection completed successfully',
+			data: stdout,
+		};
+	} catch (error: any) {
+		console.error('Error running rate limit detection:', error);
+		return {
+			success: false,
+			message: 'Rate limit detection failed',
+			error: error.message,
+		};
+	}
+}
+
+export async function getDetectionLogs(
+	type: 'signature' | 'specification' | 'hybrid' | 'all'
+): Promise<{ logs: LogEntry[]; error?: string }> {
+	try {
+		let allLogs: LogEntry[] = [];
+
+		if (type === 'signature' || type === 'all') {
+			const signatureLogs = await readCsvLogFile(path.join(publicPath, 'signature_detection_logs.csv'));
+			allLogs = [...allLogs, ...signatureLogs];
+		}
+
+		if (type === 'specification' || type === 'all') {
+			const specificationLogs = await readCsvLogFile(path.join(publicPath, 'specification_detection_logs.csv'));
+			allLogs = [...allLogs, ...specificationLogs];
+		}
+
+		if (type === 'hybrid' || type === 'all') {
+			const hybridLogs = await readCsvLogFile(path.join(publicPath, 'hybrid_detection_logs.csv'));
+			allLogs = [...allLogs, ...hybridLogs];
+		}
+
+		// Sort logs by timestamp, newest first
+		allLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+		return { logs: allLogs };
+	} catch (error: any) {
+		return {
+			logs: [],
+			error: error.message,
+		};
+	}
+}
+
+async function readCsvLogFile(filePath: string): Promise<LogEntry[]> {
+	try {
+		const fileContent = await fs.readFile(filePath, 'utf-8');
+		const lines = fileContent.split('\n');
+		const headers = lines[0].split(',');
+
+		return lines
+			.slice(1)
+			.filter((line) => line.trim() !== '')
+			.map((line) => {
+				const values = line.split(',');
+				const entry: any = {};
+
+				headers.forEach((header, index) => {
+					let value = values[index] || '';
+					entry[header] = value;
+				});
+
+				// Convert detected field to proper type after all fields are set
+				if (typeof entry.detected === 'string') {
+					entry.detected = entry.detected === 'true' ? true : entry.detected === 'false' ? false : entry.detected;
+				}
+
+				return entry as LogEntry;
+			});
+	} catch (error) {
+		// If file doesn't exist, return empty array
+		return [];
+	}
+}
+
+export async function getApiLogsSummary(): Promise<{
+	total: number;
+	attacks: number;
+	signatureDetections: number;
+	specificationDetections: number;
+	hybridDetections: number;
+}> {
+	try {
+		// Get logs count from each file
+		const [signatureLogs, specificationLogs, hybridLogs, caLogs] = await Promise.all([
+			readCsvLogFile(path.join(publicPath, 'signature_detection_logs.csv')),
+			readCsvLogFile(path.join(publicPath, 'specification_detection_logs.csv')),
+			readCsvLogFile(path.join(publicPath, 'hybrid_detection_logs.csv')),
+			readCsvLogFile(path.join(publicPath, 'ca_formatted_logs.csv')),
+		]);
+
+		// Calculate counts
+		const total = caLogs.length;
+		const attacks = caLogs.filter((log: any) => log['attack.type'] && log['attack.type'] !== '').length;
+		const signatureDetections = signatureLogs.filter((log) => log.detected !== false).length;
+		const specificationDetections = specificationLogs.filter((log) => log.detected !== false).length;
+		const hybridDetections = hybridLogs.filter((log) => log.detected !== false).length;
+
+		return {
+			total,
+			attacks,
+			signatureDetections,
+			specificationDetections,
+			hybridDetections,
+		};
+	} catch (error) {
+		// Return default values if anything fails
+		return {
+			total: 0,
+			attacks: 0,
+			signatureDetections: 0,
+			specificationDetections: 0,
+			hybridDetections: 0,
+		};
+	}
+}

@@ -1,18 +1,12 @@
 // app/api/ca/sign_result/route.ts
 
-import { getResponseMessage } from '@/constants/responseMessages';
 import { NextRequest, NextResponse } from 'next/server';
-import { createSignedConsentList } from '@/utils/signatureGenerator';
+import { getResponseMessage } from '@/constants/responseMessages';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@/utils/generateCSV';
+import { validateAuthorizationHeader } from '@/utils/validation';
 
 const prisma = new PrismaClient();
-
-const validateAuthorizationHeader = (header: string | null): boolean => {
-	if (!header) return false;
-	const [type, token] = header.split(' ');
-	return type === 'Bearer' && !!token;
-};
 
 export async function POST(req: NextRequest) {
 	const headers = req.headers;
@@ -35,54 +29,59 @@ export async function POST(req: NextRequest) {
 
 	try {
 		if (!validateAuthorizationHeader(authorization)) {
+			const response = NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('UNAUTHORIZED')),
-				'400'
+				'401'
 			);
-			return NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
+			return response;
 		}
 
 		// Validate x-api-tran-id
 		if (!xApiTranId || xApiTranId.length > 25) {
+			const response = NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
+			return response;
 		}
 
 		if (!cert_tx_id || cert_tx_id.length > 40) {
+			const response = NextResponse.json(getResponseMessage('INVALID_CERT_TX_ID'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_CERT_TX_ID')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_CERT_TX_ID'), { status: 400 });
+			return response;
 		}
 
 		if (!tx_id || tx_id.length > 74) {
+			const response = NextResponse.json(getResponseMessage('INVALID_TX_ID'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_TX_ID')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_TX_ID'), { status: 400 });
+			return response;
 		}
 
 		if (!signed_consent_len || !signed_consent || !consent_type || !consent_len || !consent) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		const account = await prisma.certificate.findFirst({
@@ -113,26 +112,16 @@ export async function POST(req: NextRequest) {
 
 		await logger(JSON.stringify(request), JSON.stringify(body), JSON.stringify(responseData), '200');
 
-		return NextResponse.json(responseData, {
-			status: 200,
-			headers: {
-				'Content-Type': 'application/json; charset=UTF-8',
-			},
-		});
+		return NextResponse.json(responseData, { status: 200 });
 	} catch (error) {
+		const response = NextResponse.json(getResponseMessage('INTERNAL_SERVER_ERROR'), { status: 500 });
 		await logger(
 			JSON.stringify(request),
 			JSON.stringify(body),
 			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')),
 			'500'
 		);
-		console.error('Error processing sign result:', error);
-		return NextResponse.json(
-			{
-				rsp_code: getResponseMessage('INTERNAL_SERVER_ERROR').code,
-				rsp_msg: getResponseMessage('INTERNAL_SERVER_ERROR').message,
-			},
-			{ status: 500 }
-		);
+		console.error('Error in processing request:', error);
+		return response;
 	}
 }

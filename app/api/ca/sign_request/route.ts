@@ -15,135 +15,6 @@ type Consent = {
 	consentLen: number;
 };
 
-/**
- * @swagger
- * /api/ca/sign_request:
- *   post:
- *     summary: Handles electronic signature requests.
- *     description: Validates the request, processes the electronic signature, and returns a certification transaction ID.
- *     tags:
- *       - Certification Authority
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               sign_tx_id:
- *                 type: string
- *                 example: ORG2025001_CA20250001_20250117120000_RITFHJGITORP
- *               user_ci:
- *                 type: string
- *                 example: 1234567890123456789012345678901234567890123456789012345678901234
- *               real_name:
- *                 type: string
- *                 example: John Doe
- *               phone_num:
- *                 type: string
- *                 example: +821012345678
- *               request_title:
- *                 type: string
- *                 example: Request for personal information
- *               device_code:
- *                 type: string
- *                 example: PC
- *               device_browser:
- *                 type: string
- *                 example: WB
- *               return_app_scheme_url:
- *                 type: string
- *                 example: mydata://auth
- *               consent_cnt:
- *                 type: number
- *                 example: 1
- *               consent_type:
- *                 type: number
- *                 example: 0
- *               consent_list:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     consent:
- *                       type: string
- *                       example: 958675948576879
- *                     consent_len:
- *                       type: number
- *                       example: 15
- *                     consent_title:
- *                       type: string
- *                       example: Consent to share personal information
- *                     tx_id:
- *                       type: string
- *                       example: MD1234567890_0987654321_1234567890_20250117120000_E349RU3IDKFJ
- *     responses:
- *       200:
- *         description: Electronic signature request successful.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 rsp_code:
- *                   type: string
- *                   example: 0000
- *                 rsp_msg:
- *                   type: string
- *                   example: Electronic signature request successful, cert_tx_id has been provided.
- *                 sign_ios_app_scheme_url:
- *                   type: string
- *                   example: mydataauth://auth?tx_id=ORG2025001
- *                 sign_aos_app_scheme_url:
- *                   type: string
- *                   example: mydataauth://auth?tx_id=ORG2025001
- *                 sign_web_url:
- *                   type: string
- *                   example: https://mydataauth.com/auth?tx_id=ORG2025001
- *                 cert_tx_id:
- *                   type: string
- *                   example: CERT2025001
- *       400:
- *         description: Invalid request parameters.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Invalid request parameters.
- *       401:
- *         description: Unauthorized request.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Unauthorized request.
- *       403:
- *         description: Invalid token.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Invalid token.
- *       500:
- *         description: Internal server error.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Internal Server Error.
- */
 export async function POST(req: NextRequest) {
 	const headers = req.headers;
 	const headersList = Object.fromEntries(headers.entries());
@@ -181,13 +52,14 @@ export async function POST(req: NextRequest) {
 
 	try {
 		if (!authorization?.startsWith('Bearer ')) {
+			const response = NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('UNAUTHORIZED')),
 				'401'
 			);
-			return NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
+			return response;
 		}
 
 		// Extract the token
@@ -197,134 +69,147 @@ export async function POST(req: NextRequest) {
 		try {
 			decodedToken = jwt.verify(token, JWT_SECRET);
 		} catch (error) {
+			const response = NextResponse.json(getResponseMessage('INVALID_TOKEN'), { status: 403 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_TOKEN')),
 				'403'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_TOKEN'), { status: 403 });
+			return response;
 		}
 
 		// Validate x-api-tran-id
 		if (!xApiTranId) {
+			const response = NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
+			return response;
 		}
 
 		if (!sign_tx_id || sign_tx_id.length > 49) {
+			const response = NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
+			return response;
 		}
 
 		if (!user_ci || user_ci.length > 100) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!real_name || real_name.length > 30) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!phone_num || phone_num.length > 15) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!request_title || request_title.length > 200) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!device_code || device_code.length > 50) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!device_browser || device_browser.length > 50) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!return_app_scheme_url || return_app_scheme_url.length > 200) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!consent_cnt || typeof consent_cnt !== 'number') {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!consent_list || (consent_list as Consent[]).length !== consent_cnt) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		if (!consent_type || consent_type.length > 1) {
+			const response = NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
 			await logger(
 				JSON.stringify(request),
 				JSON.stringify(body),
 				JSON.stringify(getResponseMessage('INVALID_PARAMETERS')),
 				'400'
 			);
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+			return response;
 		}
 
 		const certTxId = generateCertTxId();
@@ -412,14 +297,14 @@ export async function POST(req: NextRequest) {
 		// If all validations pass
 		return NextResponse.json(responseData, { status: 200 });
 	} catch (error) {
+		const response = NextResponse.json(getResponseMessage('INTERNAL_SERVER_ERROR'), { status: 500 });
 		await logger(
 			JSON.stringify(request),
 			JSON.stringify(body),
 			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')),
 			'500'
 		);
-
 		console.error('Error in processing request:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return response;
 	}
 }
