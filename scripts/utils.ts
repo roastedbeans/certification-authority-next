@@ -23,14 +23,16 @@ export interface RequestData {
 }
 
 export interface ResponseData {
+	'x-api-tran-id': string;
+	'content-type': string;
+	status: string;
 	body: string;
+	[key: string]: string;
 }
 
 export interface LogEntry {
 	request: RequestData;
 	response: ResponseData;
-	requestBody?: any;
-	responseBody?: any;
 }
 
 export interface DetectionResult {

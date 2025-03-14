@@ -44,10 +44,7 @@ export interface LogEntry {
 export async function runSignatureDetection(): Promise<DetectionResult> {
 	try {
 		// Run with a timeout to prevent hanging
-		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionSignature.ts', {
-			timeout: 30000,
-			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
-		});
+		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionSignature.ts');
 
 		return {
 			success: true,
@@ -67,10 +64,9 @@ export async function runSignatureDetection(): Promise<DetectionResult> {
 export async function runSpecificationDetection(): Promise<DetectionResult> {
 	try {
 		// Run with a timeout to prevent hanging
-		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionSpecification.ts', {
-			timeout: 30000,
-			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
-		});
+		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionSpecification.ts');
+
+		console.log('stdout', stdout);
 
 		return {
 			success: true,
@@ -90,10 +86,7 @@ export async function runSpecificationDetection(): Promise<DetectionResult> {
 export async function runHybridDetection(): Promise<DetectionResult> {
 	try {
 		// Run with a timeout to prevent hanging
-		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionHybrid.ts', {
-			timeout: 30000,
-			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
-		});
+		const { stdout, stderr } = await execPromise('npx tsx scripts/detectionHybrid.ts');
 
 		return {
 			success: true,
@@ -113,10 +106,7 @@ export async function runHybridDetection(): Promise<DetectionResult> {
 export async function runAnalysis(): Promise<DetectionResult> {
 	try {
 		// Run with a timeout to prevent hanging
-		const { stdout, stderr } = await execPromise('npx tsx scripts/analysis.ts', {
-			timeout: 30000,
-			maxBuffer: 5 * 1024 * 1024, // 5MB buffer
-		});
+		const { stdout, stderr } = await execPromise('npx tsx scripts/analysis.ts');
 
 		return {
 			success: true,
@@ -155,26 +145,36 @@ export async function runRateLimitDetection(): Promise<DetectionResult> {
 		};
 	}
 }
-
 export async function getDetectionLogs(
 	type: 'signature' | 'specification' | 'hybrid' | 'all'
 ): Promise<{ logs: LogEntry[]; error?: string }> {
 	try {
 		let allLogs: LogEntry[] = [];
+		let lastModified = new Map<string, Date>();
 
 		if (type === 'signature' || type === 'all') {
-			const signatureLogs = await readCsvLogFile(path.join(publicPath, 'signature_detection_logs.csv'));
-			allLogs = [...allLogs, ...signatureLogs];
+			const signatureFile = path.join(publicPath, 'signature_detection_logs.csv');
+			if (await hasFileChanged(signatureFile, lastModified)) {
+				const signatureLogs = await readCsvLogFile(signatureFile);
+				allLogs = [...allLogs, ...signatureLogs];
+			}
 		}
 
 		if (type === 'specification' || type === 'all') {
-			const specificationLogs = await readCsvLogFile(path.join(publicPath, 'specification_detection_logs.csv'));
-			allLogs = [...allLogs, ...specificationLogs];
+			const specFile = path.join(publicPath, 'specification_detection_logs.csv');
+			if (await hasFileChanged(specFile, lastModified)) {
+				const specificationLogs = await readCsvLogFile(specFile);
+
+				allLogs = [...allLogs, ...specificationLogs];
+			}
 		}
 
 		if (type === 'hybrid' || type === 'all') {
-			const hybridLogs = await readCsvLogFile(path.join(publicPath, 'hybrid_detection_logs.csv'));
-			allLogs = [...allLogs, ...hybridLogs];
+			const hybridFile = path.join(publicPath, 'hybrid_detection_logs.csv');
+			if (await hasFileChanged(hybridFile, lastModified)) {
+				const hybridLogs = await readCsvLogFile(hybridFile);
+				allLogs = [...allLogs, ...hybridLogs];
+			}
 		}
 
 		// Sort logs by timestamp, newest first
@@ -188,18 +188,21 @@ export async function getDetectionLogs(
 		};
 	}
 }
-
 async function readCsvLogFile(filePath: string): Promise<LogEntry[]> {
 	try {
 		const fileContent = await fs.readFile(filePath, 'utf-8');
 		const lines = fileContent.split('\n');
 		const headers = lines[0].split(',');
 
+		console.log('headers', headers);
 		return lines
 			.slice(1)
 			.filter((line) => line.trim() !== '')
 			.map((line) => {
-				const values = line.split(',');
+				// Handle values inside curly braces to prevent splitting them
+				const processedLine = line.replace(/{[^}]*}/g, (match) => match.replace(/,/g, '##COMMA##'));
+				const values = processedLine.split(',').map((val) => val.replace(/##COMMA##/g, ','));
+
 				const entry: any = {};
 
 				headers.forEach((header, index) => {
@@ -228,12 +231,26 @@ export async function getApiLogsSummary(): Promise<{
 	hybridDetections: number;
 }> {
 	try {
-		// Get logs count from each file
+		const lastModified = new Map<string, Date>();
+		// Check if files have changed before reading
+		const signatureFile = path.join(publicPath, 'signature_detection_logs.csv');
+		const specificationFile = path.join(publicPath, 'specification_detection_logs.csv');
+		const hybridFile = path.join(publicPath, 'hybrid_detection_logs.csv');
+		const caFile = path.join(publicPath, 'ca_formatted_logs.csv');
+
+		const [signatureChanged, specificationChanged, hybridChanged, caChanged] = await Promise.all([
+			hasFileChanged(signatureFile, lastModified),
+			hasFileChanged(specificationFile, lastModified),
+			hasFileChanged(hybridFile, lastModified),
+			hasFileChanged(caFile, lastModified),
+		]);
+
+		// Only read files that have changed
 		const [signatureLogs, specificationLogs, hybridLogs, caLogs] = await Promise.all([
-			readCsvLogFile(path.join(publicPath, 'signature_detection_logs.csv')),
-			readCsvLogFile(path.join(publicPath, 'specification_detection_logs.csv')),
-			readCsvLogFile(path.join(publicPath, 'hybrid_detection_logs.csv')),
-			readCsvLogFile(path.join(publicPath, 'ca_formatted_logs.csv')),
+			signatureChanged ? readCsvLogFile(signatureFile) : [],
+			specificationChanged ? readCsvLogFile(specificationFile) : [],
+			hybridChanged ? readCsvLogFile(hybridFile) : [],
+			caChanged ? readCsvLogFile(caFile) : [],
 		]);
 
 		// Calculate counts
@@ -261,3 +278,20 @@ export async function getApiLogsSummary(): Promise<{
 		};
 	}
 }
+
+// Helper to check if file has changed
+const hasFileChanged = async (filePath: string, lastModified: Map<string, Date>): Promise<boolean> => {
+	try {
+		const stats = await fs.stat(filePath);
+		const currentModified = stats.mtime;
+		const previousModified = lastModified.get(filePath);
+
+		if (!previousModified || currentModified > previousModified) {
+			lastModified.set(filePath, currentModified);
+			return true;
+		}
+		return false;
+	} catch {
+		return true; // If error reading stats, assume changed
+	}
+};

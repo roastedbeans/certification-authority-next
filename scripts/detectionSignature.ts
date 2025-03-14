@@ -1,6 +1,5 @@
 // detectionSignature.ts - Optimized signature-based detection for Certification Authority APIs
 import { createObjectCsvWriter as createCsvWriter } from 'csv-writer';
-import fs from 'fs';
 import {
 	filePath,
 	LogEntry,

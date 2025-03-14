@@ -1076,7 +1076,6 @@ async function initializeCSV(filePath: string): Promise<void> {
 // Main Function to Start Detection
 async function startDetection(logFilePath: string): Promise<void> {
 	try {
-		await initializeCSV(filePath('/public/detection_logs.csv'));
 		const filePosition = new FilePosition();
 
 		const runDetectionCycle = async () => {

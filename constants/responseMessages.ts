@@ -1,5 +1,12 @@
 // app/api/constants/responseMessages.ts
 
+export interface ResponseData {
+	headers: {
+		contentType: string;
+		xApiTranId: string;
+	};
+	body: any;
+}
 export interface ResponseMessage {
 	code: string;
 	message: string;
@@ -105,5 +112,12 @@ export function getResponseMessage(code: keyof typeof ResponseCodes, details?: s
 	return {
 		code: response.code,
 		message: details ? `${response.message}: ${details}` : response.message,
+	};
+}
+
+export function getResponseContent({ headers, body }: ResponseData): ResponseData {
+	return {
+		headers,
+		body,
 	};
 }

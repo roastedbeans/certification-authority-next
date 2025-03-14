@@ -458,7 +458,7 @@ class SpecificationBasedDetection {
 			message:
 				'Authorization header does NOT match the specification, possible Token Manipulation or JWT Tampering Attack',
 		}),
-		'content-type': z.string().refine((val) => val === 'application/json', {
+		'content-type': z.string().refine((val) => val === 'application/json;charset=UTF-8', {
 			message:
 				'Content-Type does NOT match the specification, possible Content Type Manipulation, Spoofing, MIME Confusion Attack or Request Smuggling Attack',
 		}),
@@ -1092,21 +1092,9 @@ async function detectIntrusions(entry: LogEntry): Promise<void> {
 	}
 }
 
-// Initialize CSV
-async function initializeCSV(filePath: string): Promise<void> {
-	if (!fs.existsSync(filePath)) {
-		const csvWriter = createCsvWriter({
-			path: filePath,
-			header: detectionCSVLoggerHeader,
-		});
-		await csvWriter.writeRecords([]);
-	}
-}
-
 // Main Function to Start Detection
 async function startDetection(logFilePath: string): Promise<void> {
 	try {
-		await initializeCSV(filePath('/public/detection_logs.csv'));
 		const filePosition = new FilePosition();
 
 		const runDetectionCycle = async () => {

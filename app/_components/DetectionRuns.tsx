@@ -25,15 +25,17 @@ export default function DetectionRuns() {
 
 		try {
 			const result = await action();
+
+			console.log('result', result);
 			setResult(result);
 			setOutput(result.data || '');
 		} catch (error) {
-			console.error(`Error running ${type} detection:`, error);
-			setResult({
-				success: false,
-				message: `Failed to run ${type} detection`,
-				error: error instanceof Error ? error.message : String(error),
-			});
+			// console.error(`Error running ${type} detection:`, error);
+			// setResult({
+			// 	success: false,
+			// 	message: `Failed to run ${type} detection`,
+			// 	error: error instanceof Error ? error.message : String(error),
+			// });
 		} finally {
 			setLoading(null);
 		}

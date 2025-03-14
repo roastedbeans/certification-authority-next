@@ -1,101 +1,453 @@
 import { createObjectCsvWriter as createCsvWriter } from 'csv-writer';
+import { parse as csvParse } from 'csv-parse/sync';
+import fs from 'fs';
 import { z } from 'zod';
 import {
-	filePath,
 	LogEntry,
+	RequestData,
+	ResponseData,
 	DetectionResult,
 	LogRecord,
-	FilePosition,
-	readNewLogEntries,
-	ensureLogFile,
+	filePath,
 	detectionCSVLoggerHeader,
 } from './utils';
+class FilePosition {
+	private position: number;
+
+	constructor() {
+		this.position = 0;
+	}
+
+	getPosition(): number {
+		return this.position;
+	}
+
+	setPosition(pos: number): void {
+		this.position = pos;
+	}
+}
 
 // Specification-based Detection Implementation
 class SpecificationBasedDetection {
-	private static readonly defaultRequestHeadersSchema = z
-		.object({
-			url: z.string().url(),
-			method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']),
-			authorization: z.string().optional(),
-			'user-agent': z.string(),
-			'x-api-tran-id': z.string().regex(/^[A-Z][0-9]{11,12}$/),
-			'x-api-type': z.enum(['CA', 'IP', 'MDO']),
-			'x-csrf-token': z.string().optional(),
-			cookie: z.string().optional(),
-			'set-cookie': z.string().optional(),
-			'content-length': z
-				.string()
-				.transform((val) => parseInt(val, 10))
-				.pipe(z.number().int().positive()),
-			body: z.string(),
-		})
-		.strict()
-		.passthrough();
+	private static readonly defaultRequestHeadersSchema = z.object({
+		'content-length': z.string().max(10, {
+			message: 'Content-Length does NOT match the specification, possible Buffer Overflow Attack or Request Smuggling',
+		}),
+		'user-agent': z.string().max(50, {
+			message: 'User-Agent does NOT match the specification, possible User-Agent Spoofing or Command Injection Attack',
+		}),
+		cookie: z.string().max(0, {
+			message: 'Cookie header does NOT match the specification, possible Session Hijacking or Cookie Poisoning Attack',
+		}),
+		'set-cookie': z.string().max(0, {
+			message:
+				'Set-Cookie header does NOT match the specification, possible Cross-Site Cooking or Cookie Injection Attack',
+		}),
+		'x-csrf-token': z.string().max(0, {
+			message: 'X-CSRF-Token header does NOT match the specification, possible Cross-Site Request Forgery Attack',
+		}),
+		'x-api-tran-id': z
+			.string()
+			.length(25, {
+				message:
+					'X-API-Tran-ID does NOT match the specification, possible Transaction ID Tampering or Request Replay Attack',
+			})
+			.refine((str) => ['M', 'S', 'R', 'C', 'P', 'A'].includes(str.charAt(10)), {
+				message:
+					'X-API-Tran-ID character does NOT match the specification, possible Transaction Format Manipulation Attack',
+			}),
+		'x-api-type': z.string().max(0, {
+			message: 'X-API-Type header does NOT match the specification, possible API Injection or Request Forgery Attack',
+		}),
+	});
 
 	private static readonly withTokenRequestHeadersSchema = {
-		authorization: z.string().regex(/^Bearer [A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/),
+		authorization: z.string().max(1500, {
+			message:
+				'Authorization header does NOT match the specification, possible Token Manipulation or JWT Tampering Attack',
+		}),
+		'content-type': z.string().refine((val) => val === 'application/json;charset=UTF-8', {
+			message:
+				'Content-Type does NOT match the specification, possible Content Type Manipulation, Spoofing, MIME Confusion Attack or Request Smuggling Attack',
+		}),
 	};
 
-	private static readonly defaultResponseHeadersSchema = z
-		.object({
-			body: z.string(),
-		})
-		.strict()
-		.passthrough();
+	private static readonly defaultResponseHeadersSchema = z.object({
+		'x-api-tran-id': z
+			.string()
+			.length(25, {
+				message:
+					'Response X-API-Tran-ID does NOT match the specification, possible Response Tampering or Man-in-the-Middle Attack',
+			})
+			.refine((str) => ['M', 'S', 'R', 'C', 'P', 'A'].includes(str.charAt(10)), {
+				message: 'Response X-API-Tran-ID does NOT match the specification, possible Response Integrity Attack',
+			}),
+	});
 
 	private static readonly rateLimiting = {
-		maxRequestsPerMinute: 60,
-		maxRequestsPerHour: 1000,
-		maxPayloadSize: 10 * 1024, // 10KB
+		rateLimiting: {
+			maxRequestsPerMinute: 100,
+			maxPayloadSize: 1000,
+		},
 	};
 
 	private static readonly apiSchemas: {
 		[key: string]: { [method: string]: { request: z.ZodTypeAny; response: z.ZodTypeAny } };
 	} = {
-		// OAuth 2.0 Token Endpoint
-		'/api/oauth/2.0/token': {
+		'/api/v2/mgmts/oauth/2.0/token': {
 			POST: {
 				request: z.object({
-					headers: SpecificationBasedDetection.defaultRequestHeadersSchema,
-					body: z.string().refine(
-						(body) => {
-							try {
-								const params = new URLSearchParams(body);
-								return (
-									(params.get('grant_type') === 'client_credentials' &&
-										params.has('client_id') &&
-										params.has('client_secret') &&
-										params.has('scope')) ||
-									(params.get('grant_type') === 'authorization_code' &&
-										params.has('code') &&
-										params.has('redirect_uri') &&
-										params.has('client_id'))
-								);
-							} catch (e) {
-								return false;
-							}
-						},
-						{ message: 'Invalid OAuth 2.0 token request' }
-					),
+					headers: SpecificationBasedDetection.defaultRequestHeadersSchema.extend({
+						'content-type': z.string().refine((val) => val === 'application/x-www-form-urlencoded', {
+							message:
+								'Content-Type does NOT match the specification, possible OAuth Parameter Injection or Content Type Confusion Attack',
+						}),
+					}),
+					body: z.object({
+						grant_type: z.string().refine((val) => val === 'client_credentials', {
+							message:
+								'grant_type does NOT match the specification, possible Grant Type Confusion or OAuth Bypass Attack',
+						}),
+						client_id: z.string().length(50, {
+							message:
+								'client_id does NOT match the specification, possible Client Impersonation Attack, ID Injection or Enumeration Attack',
+						}),
+						client_secret: z.string().length(50, {
+							message:
+								'client_secret does NOT match the specification, possible Credential Stuffing, Brute Force Attack or possible Secret Injection Attack',
+						}),
+						scope: z.string().refine((val) => val === 'manage', {
+							message: 'scope does NOT match the specification, possible Permission Escalation Attack',
+						}),
+					}),
 				}),
 				response: z.object({
 					headers: SpecificationBasedDetection.defaultResponseHeadersSchema,
-					body: z.string().refine(
-						(body) => {
-							try {
-								const data = JSON.parse(body);
-								return (
-									typeof data.access_token === 'string' &&
-									typeof data.token_type === 'string' &&
-									typeof data.expires_in === 'number'
-								);
-							} catch (e) {
-								return false;
-							}
-						},
-						{ message: 'Invalid OAuth 2.0 token response' }
+					body: z.object({
+						token_type: z.string().refine((val) => val === 'Bearer', {
+							message:
+								'token_type does NOT match the specification, possible Token Type Manipulation or Confusion Attack',
+						}),
+						access_token: z.string().max(1500, {
+							message:
+								'access_token does NOT match the specification, possible Token Injection or JWT Tampering Attack',
+						}),
+						expires_in: z.number().max(999999999, {
+							message: 'expires_in does NOT match the specification, possible Token Expiration Manipulation Attack',
+						}),
+						scope: z.string().refine((val) => val === 'manage', {
+							message: 'scope does NOT match the specification, possible Scope Escalation or Scope Tampering Attack',
+						}),
+						timestamp: z.string().length(14, {
+							message: 'timestamp does NOT match the specification, possible Timestamp Tampering or Injection Attack',
+						}),
+						rsp_code: z.string().max(30, {
+							message: 'rsp_code does NOT match the specification, possible Response Code Manipulation Attack',
+						}),
+						rsp_msg: z.string().max(450, {
+							message: 'rsp_msg does NOT match the specification, possible Response Message Manipulation Attack',
+						}),
+					}),
+				}),
+			},
+		},
+		'/api/v2/mgmts/orgs': {
+			GET: {
+				request: z.object({
+					headers: SpecificationBasedDetection.defaultRequestHeadersSchema
+						.extend({
+							// find the search param search_timestamp
+							url: z.string().refine(
+								(val) => {
+									try {
+										const searchTimestamp = new URL(val).searchParams.get('search_timestamp');
+										const timestamp =
+											searchTimestamp !== null && (searchTimestamp.length === 0 || searchTimestamp.length === 14);
+										if (timestamp) {
+											return true;
+										} else {
+											return false;
+										}
+									} catch {
+										return false;
+									}
+								},
+								{
+									message:
+										'parameter in URL does NOT match the specification, possible Parameter Tampering or Injection Attack',
+								}
+							),
+						})
+						.extend(SpecificationBasedDetection.withTokenRequestHeadersSchema),
+				}),
+				response: z.object({
+					headers: SpecificationBasedDetection.defaultResponseHeadersSchema,
+					body: z.object({
+						rsp_code: z.string().max(30, {
+							message: 'rsp_code does NOT match the specification, possible Response Code Manipulation Attack',
+						}),
+						rsp_msg: z.string().max(100, {
+							message:
+								'rsp_msg does NOT match the specification, possible Response Injection or Information Disclosure Attack',
+						}),
+						search_timestamp: z.string().max(14, {
+							message: 'search_timestamp does NOT match the specification, possible Timestamp Manipulation Attack',
+						}),
+						org_cnt: z.number().max(999, {
+							message: 'org_cnt does NOT match the specification, possible Resource Enumeration or DoS Attack',
+						}),
+						org_list: z.array(z.object({}), {
+							message: 'org_list does NOT match the specification, possible Data Structure Manipulation Attack',
+						}),
+					}),
+				}),
+			},
+		},
+		'/api/oauth/2.0/token': {
+			POST: {
+				request: z.object({
+					headers: SpecificationBasedDetection.defaultRequestHeadersSchema.extend({
+						'content-type': z.string().refine((val) => val === 'application/x-www-form-urlencoded', {
+							message: 'Content-Type must be application/x-www-form-urlencoded for OAuth token request',
+						}),
+					}),
+					body: z.object({
+						grant_type: z.string().refine((val) => val === 'client_credentials', {
+							message:
+								'grant_type does NOT match the specification, possible OAuth Injection, Flow Tampering or Grant Type Manipulation Attack',
+						}),
+						client_id: z.string().length(50, {
+							message:
+								'client_id does NOT match the specification, possible Client Impersonation Attack, ID Injection or Enumeration Attack',
+						}),
+						client_secret: z.string().length(50, {
+							message:
+								'client_secret does NOT match the specification, possible Credential Stuffing, Brute Force Attack or possible Secret Injection Attack',
+						}),
+						scope: z.string().refine((val) => val === 'ca', {
+							message: 'scope does NOT match the specification, possible Permission Escalation Attack',
+						}),
+					}),
+				}),
+				response: z.object({
+					headers: SpecificationBasedDetection.defaultResponseHeadersSchema,
+					body: z.object({
+						token_type: z.string().refine((val) => val === 'Bearer', {
+							message:
+								'token_type does NOT match the specification, possible Token Type Manipulation or Confusion Attack',
+						}),
+						access_token: z.string().max(1500, {
+							message:
+								'access_token does NOT match the specification, possible Token Injection or JWT Signature Tampering Attack',
+						}),
+						expires_in: z.number().max(999999999, {
+							message: 'expires_in does NOT match the specification, possible Token Lifetime Manipulation Attack',
+						}),
+						scope: z.string().refine((val) => val === 'ca', {
+							message: 'scope does NOT match the specification, possible Permission Escalation Attack',
+						}),
+					}),
+				}),
+			},
+		},
+
+		'/api/ca/sign_request': {
+			POST: {
+				request: z.object({
+					headers: SpecificationBasedDetection.defaultRequestHeadersSchema.extend(
+						SpecificationBasedDetection.withTokenRequestHeadersSchema
 					),
+					body: z.object({
+						sign_tx_id: z.string().length(49, {
+							message: 'sign_tx_id does NOT match the specification, possible Signature Transaction Forgery Attack',
+						}),
+						user_ci: z
+							.string()
+							.max(100, {
+								message: 'user_ci does NOT match the specification, possible Identity Spoofing Attack',
+							})
+							.base64({
+								message:
+									'user_ci does NOT match the specification, possible Base64 Encoding Attack or Injection Attack',
+							}),
+						real_name: z.string().max(30, {
+							message: 'real_name does NOT match the specification, possible Identity Spoofing or Homograph Attack',
+						}),
+						phone_num: z
+							.string()
+							.max(15, {
+								message: 'phone_num does NOT match the specification, possible Phone Number Spoofing Attack',
+							})
+							.startsWith('+82', {
+								message: 'phone_num does NOT match the specification, possible Country Code Manipulation Attack',
+							}),
+						request_title: z.string().max(100, {
+							message: 'request_title does NOT match the specification, possible Data Injection or XSS Attack',
+						}),
+						device_code: z.enum(['PC', 'TB', 'MO'], {
+							message: 'device_code does NOT match the specification, possible Device Spoofing Attack',
+						}),
+						device_browser: z.enum(['WB', 'NA', 'HY'], {
+							message:
+								'device_browser does NOT match the specification, possible Browser Fingerprinting Evasion Attack',
+						}),
+						return_app_scheme_url: z
+							.string()
+							.max(100, {
+								message:
+									'return_app_scheme_url does NOT match the specification, possible Open Redirect or URL Scheme Injection Attack',
+							})
+							.optional(),
+						consent_type: z.string().length(1, {
+							message: 'consent_type does NOT match the specification, possible Consent Manipulation Attack',
+						}),
+						consent_cnt: z.number().max(9999, {
+							message: 'consent_cnt does NOT match the specification, possible Consent Enumeration or DoS Attack',
+						}),
+						consent_list: z.array(
+							z.object({
+								consent_len: z.number().max(999, {
+									message: 'consent_len does NOT match the specification, possible Content Length Manipulation Attack',
+								}),
+								consent_title: z.string().max(100, {
+									message: 'consent_title does NOT match the specification, possible Content Injection or XSS Attack',
+								}),
+								consent: z.string().max(500, {
+									message:
+										'consent does NOT match the specification, possible Consent Forgery or Content Injection Attack',
+								}),
+								tx_id: z.string().length(74, {
+									message: 'tx_id does NOT match the specification, possible Transaction ID Forgery Attack',
+								}),
+							}),
+							{
+								message: 'consent_list does NOT match the specification, possible Array Structure Manipulation Attack',
+							}
+						),
+					}),
+				}),
+				response: z.object({
+					headers: SpecificationBasedDetection.defaultResponseHeadersSchema,
+					body: z.object({
+						rsp_code: z.string().max(30, {
+							message: 'rsp_code does NOT match the specification, possible Response Code Manipulation Attack',
+						}),
+						rsp_msg: z.string().max(450, {
+							message: 'rsp_msg does NOT match the specification, possible Response Injection or XSS Attack',
+						}),
+						cert_tx_id: z.string().length(40, {
+							message:
+								'cert_tx_id does NOT match the specification, possible Certificate Transaction ID Forgery Attack',
+						}),
+					}),
+				}),
+			},
+		},
+
+		'/api/ca/sign_result': {
+			POST: {
+				request: z.object({
+					headers: SpecificationBasedDetection.defaultRequestHeadersSchema.extend(
+						SpecificationBasedDetection.withTokenRequestHeadersSchema
+					),
+					body: z.object({
+						cert_tx_id: z.string().length(40, {
+							message:
+								'cert_tx_id does NOT match the specification, possible Certificate Transaction ID Forgery Attack',
+						}),
+						sign_tx_id: z.string().length(49, {
+							message: 'sign_tx_id does NOT match the specification, possible Signature Transaction ID Forgery Attack',
+						}),
+					}),
+				}),
+				response: z.object({
+					headers: SpecificationBasedDetection.defaultResponseHeadersSchema,
+					body: z.object({
+						rsp_code: z.string().max(30, {
+							message: 'rsp_code does NOT match the specification, possible Response Code Manipulation Attack',
+						}),
+						rsp_msg: z.string().max(450, {
+							message: 'rsp_msg does NOT match the specification, possible Response Injection or XSS Attack',
+						}),
+						signed_consent_cnt: z.number().max(9999, {
+							message:
+								'signed_consent_cnt does NOT match the specification, possible Consent Enumeration or DoS Attack',
+						}),
+						signed_consent_list: z.array(
+							z.object({
+								signed_consent_len: z.number().max(999, {
+									message:
+										'signed_consent_len does NOT match the specification, possible Content Length Manipulation Attack',
+								}),
+								signed_consent: z
+									.string()
+									.max(10000, {
+										message:
+											'signed_consent does NOT match the specification, possible Content Injection or XSS Attack',
+									})
+									.base64url({ message: 'signed_consent must be valid base64url encoded string' }),
+								tx_id: z.string().length(74, {
+									message: 'tx_id does NOT match the specification, possible Transaction ID Forgery Attack',
+								}),
+							}),
+							{ message: 'signed_consent_list must be an array of valid signed consent objects' }
+						),
+					}),
+				}),
+			},
+		},
+		'/api/ca/sign_verification': {
+			POST: {
+				request: z.object({
+					headers: SpecificationBasedDetection.defaultRequestHeadersSchema.extend(
+						SpecificationBasedDetection.withTokenRequestHeadersSchema
+					),
+					body: z.object({
+						tx_id: z.string().length(74, {
+							message: 'tx_id does NOT match the specification, possible Transaction ID Forgery Attack',
+						}),
+						cert_tx_id: z.string().length(40, {
+							message:
+								'cert_tx_id does NOT match the specification, possible Certificate Transaction ID Forgery Attack',
+						}),
+						signed_consent_len: z.number().max(999, {
+							message:
+								'signed_consent_len does NOT match the specification, possible Content Length Manipulation Attack',
+						}),
+						signed_consent: z
+							.string()
+							.max(10000, {
+								message: 'signed_consent does NOT match the specification, possible Content Injection or XSS Attack',
+							})
+							.base64url({ message: 'signed_consent must be valid base64url encoded string' }),
+						consent_type: z.string().length(1, {
+							message: 'consent_type does NOT match the specification, possible Consent Manipulation Attack',
+						}),
+						consent_len: z.number().max(999, {
+							message: 'consent_len does NOT match the specification, possible Content Length Manipulation Attack',
+						}),
+						consent: z.string().max(500, {
+							message: 'consent does NOT match the specification, possible Consent Forgery or Content Injection Attack',
+						}),
+					}),
+				}),
+				response: z.object({
+					headers: SpecificationBasedDetection.defaultResponseHeadersSchema,
+					body: z.object({
+						tx_id: z.string().length(74, {
+							message: 'tx_id does NOT match the specification, possible Transaction ID Forgery Attack',
+						}),
+						rsp_code: z.string().max(30, {
+							message: 'rsp_code does NOT match the specification, possible Response Code Manipulation Attack',
+						}),
+						rsp_msg: z.string().max(450, {
+							message: 'rsp_msg does NOT match the specification, possible Response Injection or XSS Attack',
+						}),
+						user_ci: z.string().max(100, {
+							message: 'user_ci does NOT match the specification, possible Identity Spoofing Attack',
+						}),
+						result: z.boolean(),
+					}),
 				}),
 			},
 		},
@@ -105,46 +457,69 @@ class SpecificationBasedDetection {
 
 	private isRateLimitExceeded(clientId: string): boolean {
 		const now = Date.now();
-		const oneMinuteAgo = now - 60 * 1000;
-		const oneHourAgo = now - 60 * 60 * 1000;
-
-		// Initialize if not exists
-		if (!this.requestHistory.has(clientId)) {
-			this.requestHistory.set(clientId, [now]);
-			return false;
-		}
-
-		// Get existing timestamps and add current
-		const timestamps = this.requestHistory.get(clientId) || [];
-		timestamps.push(now);
-
-		// Clean old timestamps
-		const recentTimestamps = timestamps.filter((time) => time >= oneHourAgo);
-		this.requestHistory.set(clientId, recentTimestamps);
-
-		// Check rate limits
-		const requestsLastMinute = recentTimestamps.filter((time) => time >= oneMinuteAgo).length;
-		const requestsLastHour = recentTimestamps.length;
-
-		return (
-			requestsLastMinute > SpecificationBasedDetection.rateLimiting.maxRequestsPerMinute ||
-			requestsLastHour > SpecificationBasedDetection.rateLimiting.maxRequestsPerHour
-		);
+		const windowSize = 60000;
+		let requests = this.requestHistory.get(clientId) || [];
+		requests = requests.filter((timestamp) => now - timestamp < windowSize);
+		requests.push(now);
+		this.requestHistory.set(clientId, requests);
+		return requests.length > SpecificationBasedDetection.rateLimiting.rateLimiting.maxRequestsPerMinute;
 	}
 
 	private isPayloadSizeExceeded(entry: LogEntry): { isExceeded: boolean; overloadedFields: string[] } {
+		const maxSize = SpecificationBasedDetection.rateLimiting.rateLimiting.maxPayloadSize;
 		const overloadedFields: string[] = [];
 
-		// Check request body
-		if (entry.request.body.length > SpecificationBasedDetection.rateLimiting.maxPayloadSize) {
-			overloadedFields.push('request.body');
-		}
+		if (entry.request) {
+			// Check all fields individually
+			const fieldsToCheck = {
+				url: entry.request.url,
+				method: entry.request.method,
+				authorization: entry.request.authorization,
+				'user-agent': entry.request['user-agent'],
+				'x-api-tran-id': entry.request['x-api-tran-id'],
+				'x-api-type': entry.request['x-api-type'],
+				'x-csrf-token': entry.request['x-csrf-token'],
+				cookie: entry.request.cookie,
+				'set-cookie': entry.request['set-cookie'],
+				'content-length': entry.request['content-length'],
+				body: entry.request.body,
+			};
 
-		// Check headers
-		for (const [key, value] of Object.entries(entry.request)) {
-			if (typeof value === 'string' && value.length > 1000) {
-				overloadedFields.push(`request.${key}`);
+			for (const [key, value] of Object.entries(fieldsToCheck)) {
+				if (value) {
+					let size: number;
+					if (typeof value === 'string') {
+						size = Buffer.from(value).length;
+					} else {
+						size = Buffer.from(JSON.stringify(value)).length;
+					}
+
+					if (size > maxSize) {
+						console.log(`Overloaded field: ${key}, size: ${size}`);
+						overloadedFields.push(key);
+						entry.request[key as keyof RequestData] = 'overload here';
+					}
+				}
 			}
+
+			// Handle additional fields from index signature
+			const standardKeys = Object.keys(fieldsToCheck);
+			Object.entries(entry.request).forEach(([key, value]) => {
+				if (!standardKeys.includes(key) && value) {
+					let size: number;
+					if (typeof value === 'string') {
+						size = Buffer.from(value).length;
+					} else {
+						size = Buffer.from(JSON.stringify(value)).length;
+					}
+
+					if (size > maxSize) {
+						console.log(`Overloaded field: ${key}, size: ${size}`);
+						overloadedFields.push(key);
+						entry.request[key] = 'overload here';
+					}
+				}
+			});
 		}
 
 		return {
@@ -154,148 +529,337 @@ class SpecificationBasedDetection {
 	}
 
 	detect(entry: LogEntry): DetectionResult {
+		// Check rate limiting
+		const clientId = entry.request['x-api-tran-id'];
+		if (clientId && this.isRateLimitExceeded(clientId)) {
+			return {
+				detected: true,
+				reason: 'Rate limit exceeded',
+			};
+		}
+
+		// Check payload size
+		const payloadCheck = this.isPayloadSizeExceeded(entry);
+		if (payloadCheck.isExceeded) {
+			return {
+				detected: true,
+				reason: `Payload size exceeded in fields: ${payloadCheck.overloadedFields.join(', ')}`,
+			};
+		}
+
 		try {
-			// Extract request URL
-			const url = new URL(entry.request.url);
-			const path = url.pathname;
+			// Validate URL format first
+			if (!entry.request.url || !entry.request.url.trim()) {
+				return {
+					detected: true,
+					reason: 'Missing URL in request',
+				};
+			}
+
+			// Check if URL is valid
+			let url;
+			try {
+				url = new URL(entry.request.url);
+			} catch (error) {
+				return {
+					detected: true,
+					reason: `Invalid URL format: ${entry.request.url}`,
+				};
+			}
+
+			const pathname = url.pathname;
 			const method = entry.request.method;
+			const spec = SpecificationBasedDetection.apiSchemas[pathname]?.[method];
 
-			// 1. Check for payload size limits
-			const payloadCheck = this.isPayloadSizeExceeded(entry);
-			if (payloadCheck.isExceeded) {
+			// Path validation
+			if (!spec) {
 				return {
 					detected: true,
-					reason: `Payload size exceeded limit in fields: ${payloadCheck.overloadedFields.join(', ')}`,
+					reason: `Unknown endpoint or method: ${pathname} ${method}`,
 				};
 			}
 
-			// 2. Check for rate limiting
-			const clientId = entry.request['x-api-tran-id'] || 'anonymous';
-			if (this.isRateLimitExceeded(clientId)) {
-				return {
-					detected: true,
-					reason: `Rate limit exceeded for client ${clientId}`,
-				};
+			try {
+				spec.request.parse({
+					headers: entry.request,
+					body: entry.request.body,
+				});
+			} catch (error) {
+				if (error instanceof z.ZodError) {
+					return {
+						detected: true,
+						reason: `Request specification violation: ${error.errors[0].message}`,
+					};
+				}
+				throw error;
 			}
 
-			// 3. Find the schema for this endpoint and method
-			const endpointSchema = SpecificationBasedDetection.apiSchemas[path]?.[method];
-			if (!endpointSchema) {
-				return {
-					detected: false,
-					reason: `No schema defined for ${method} ${path}`,
-				};
-			}
-
-			// 4. Validate against the schema
-			const result = endpointSchema.request.safeParse({
-				headers: entry.request,
-				body: entry.request.body,
-			});
-
-			if (!result.success) {
-				const errors = result.error.errors.map((err) => `${err.path.join('.')}: ${err.message}`);
-				return {
-					detected: true,
-					reason: `Schema violation: ${errors.join(', ')}`,
-				};
+			try {
+				spec.response.parse({
+					headers: entry.request,
+					body: entry.response.body,
+				});
+			} catch (error) {
+				if (error instanceof z.ZodError) {
+					return {
+						detected: true,
+						reason: `Response specification violation: ${error.errors[0].message}`,
+					};
+				}
+				throw error;
 			}
 
 			return {
 				detected: false,
-				reason: 'Request conforms to specification',
+				reason: 'Request/Response conform to specifications',
 			};
 		} catch (error) {
-			console.error('Error in specification detection:', error);
+			console.error('Error during detection:', error);
 			return {
-				detected: false,
-				reason: `Error during detection: ${error instanceof Error ? error.message : String(error)}`,
+				detected: true,
+				reason: `Unexpected error: ${(error as Error).message}`,
 			};
 		}
 	}
 }
 
-// Logging Function
-async function logDetectionResult(entry: LogEntry, result: DetectionResult): Promise<void> {
+// Log Processing Functions for CSV format
+async function readNewCSVLogEntries(filePath: string, filePosition: FilePosition): Promise<LogEntry[]> {
 	try {
-		const csvPath = filePath('/public/specification_detection_logs.csv');
+		// Check if file exists
+		if (!fs.existsSync(filePath)) {
+			return [];
+		}
 
-		// Ensure the CSV file exists
-		await ensureLogFile(csvPath, 'timestamp,detectionType,detected,reason,request,response\n');
+		// Read file stats
+		const stats = fs.statSync(filePath);
 
-		const csvWriter = createCsvWriter({
-			path: csvPath,
-			append: true,
-			header: detectionCSVLoggerHeader,
+		// If no new data, return empty array
+		if (stats.size <= filePosition.getPosition()) {
+			return [];
+		}
+
+		// Read new data from file
+		const fileData = fs.readFileSync(filePath, 'utf-8');
+		const currentPosition = filePosition.getPosition();
+		const newData = fileData.slice(currentPosition);
+
+		// Update file position
+		filePosition.setPosition(stats.size);
+
+		// If no new data, return empty array
+		if (!newData.trim()) {
+			return [];
+		}
+
+		// Parse CSV data directly with headers in the file
+		const records = csvParse(newData, {
+			columns: true,
+			skip_empty_lines: true,
+			relax_column_count: true, // Handle potential inconsistencies in CSV
 		});
 
-		const record: LogRecord = {
-			timestamp: new Date().toISOString(),
-			detectionType: 'Specification',
-			detected: result.detected,
-			reason: result.reason,
-			request: JSON.stringify(entry.request),
-			response: JSON.stringify(entry.response),
-		};
+		// Convert CSV records to LogEntry format
+		return records.map((record: any) => {
+			// Add logging for debugging
+			console.log('Processing CSV record:', record['request.url']);
+			console.log('record', record);
 
-		await csvWriter.writeRecords([record]);
+			// Map CSV fields to the format expected by the detection system
+			const request: RequestData = {
+				url: record['request.url'] || '',
+				method: record['request.method'] || 'GET', // Default to GET if missing
+				authorization: record['request.headers.authorization'] || '',
+				'user-agent': record['request.headers.user-agent'] || '',
+				'x-api-tran-id': record['request.headers.x-api-tran-id'] || '',
+				'x-api-type': record['request.headers.x-api-type'] || '',
+				'x-csrf-token': record['request.headers.x-csrf-token'] || '',
+				cookie: record['request.headers.cookie'] || '',
+				'set-cookie': record['request.headers.set_cookie'] || '',
+				'content-type': record['request.headers.content-type'] || '',
+				'content-length': record['request.headers.content-length'] || '0', // Default to 0 if missing
+				body: record['request.body'] || '',
+			};
 
-		if (result.detected) {
-			console.log(`[${record.timestamp}] 🚨 Anomaly detected: ${result.reason}`);
-		} else {
-			console.log(`[${record.timestamp}] ✅ Request conforms to specification`);
-		}
+			// Parse request body if it's a JSON string
+			try {
+				if (request.body && typeof request.body === 'string' && request.body.trim().startsWith('{')) {
+					request.body = JSON.parse(request.body);
+				}
+			} catch (error) {
+				console.warn('Failed to parse request body as JSON:', error);
+			}
+
+			// Ensure response status is included
+			const response: ResponseData = {
+				'x-api-tran-id': record['response.headers.x-api-tran-id'] || '',
+				'content-type': record['response.headers.content-type'] || '',
+				status: record['response.status'] || '',
+				body: record['response.body'] || '',
+			};
+
+			// Parse response body if it's a JSON string
+			try {
+				if (response.body && typeof response.body === 'string' && response.body.trim().startsWith('{')) {
+					response.body = JSON.parse(response.body);
+				}
+			} catch (error) {
+				console.warn('Failed to parse response body as JSON:', error);
+			}
+
+			// Add response status to response object
+			if (record['response.status']) {
+				(response as any)['status'] = record['response.status'];
+			}
+
+			// Include attack type which may be useful for detection
+			if (record['attack.type']) {
+				request['attack-type'] = record['attack.type'];
+			}
+
+			return {
+				request,
+				response,
+				requestBody: request.body,
+				responseBody: response.body,
+			};
+		});
 	} catch (error) {
-		console.error('Error logging detection result:', error);
+		console.error('Error reading CSV log entries:', error);
+		return [];
 	}
+}
+
+// Logging Function
+async function logDetectionResult(
+	entry: LogEntry,
+	detectionType: 'Specification',
+	result: DetectionResult
+): Promise<void> {
+	if (!fs.existsSync(filePath('/public/specification_detection_logs.csv'))) {
+		fs.writeFileSync(
+			filePath('/public/specification_detection_logs.csv'),
+			'timestamp,detectionType,detected,reason,request,response\n'
+		);
+	}
+
+	const csvWriter2 = createCsvWriter({
+		path: filePath('/public/specification_detection_logs.csv'),
+		append: true,
+		header: detectionCSVLoggerHeader,
+	});
+
+	console.log('entry.request', entry.request);
+
+	const record: LogRecord = {
+		timestamp: new Date().toISOString(),
+		detectionType,
+		detected: result.detected,
+		reason: result.reason,
+		request: JSON.stringify(entry.request),
+		response: JSON.stringify(entry.response),
+	};
+
+	await csvWriter2.writeRecords([record]);
 }
 
 // Main Detection Function
 async function detectIntrusions(entry: LogEntry): Promise<void> {
 	try {
-		const detector = new SpecificationBasedDetection();
-		const result = detector.detect(entry);
-		await logDetectionResult(entry, result);
+		console.log('--------------------------------------------------');
+		console.log(`Processing request to: ${entry.request.url}`);
+
+		const specificationDetector = new SpecificationBasedDetection();
+		const specificationResult = specificationDetector.detect(entry);
+
+		if (specificationResult.detected) {
+			await logDetectionResult(entry, 'Specification', specificationResult);
+			console.log('⚠️ INTRUSION DETECTED ⚠️');
+			console.log(`Reason: ${specificationResult.reason}`);
+			console.log(`URL: ${entry.request.url}`);
+			console.log(`Method: ${entry.request.method}`);
+		} else {
+			await logDetectionResult(entry, 'Specification', specificationResult);
+			console.log('✅ Request conforms to specifications');
+		}
+		console.log('--------------------------------------------------');
 	} catch (error) {
-		console.error('Error in intrusion detection:', error);
+		console.error('Error in detectIntrusions:', error);
+		const errorResult: DetectionResult = {
+			detected: true,
+			reason: `Error processing entry: ${(error as Error).message}`,
+		};
+		await logDetectionResult(entry, 'Specification', errorResult);
 	}
 }
 
-// Start Detection Process
-async function startDetection(logFilePath: string): Promise<void> {
-	console.log('Starting specification-based detection...');
-	console.log(`Monitoring log file: ${logFilePath}`);
+// Initialize CSV
+async function initializeCSV(filePath: string): Promise<void> {
+	if (!fs.existsSync(filePath)) {
+		const csvWriter = createCsvWriter({
+			path: filePath,
+			header: detectionCSVLoggerHeader,
+		});
+		await csvWriter.writeRecords([]);
+	}
+}
 
-	const filePosition = new FilePosition();
+// Main Function to Start Detection
+export async function startDetection(logFilePath: string): Promise<void> {
+	try {
+		await initializeCSV(filePath('/public/specification_detection_logs.csv'));
+		const filePosition = new FilePosition();
 
-	// Create a detection cycle
-	const runDetectionCycle = async () => {
-		try {
-			const entries = await readNewLogEntries(logFilePath, filePosition);
+		// First, read the entire file initially to catch up
+		console.log('Initial reading of the log file...');
+		const initialEntries = await readNewCSVLogEntries(logFilePath, filePosition);
 
-			if (entries.length > 0) {
-				console.log(`Processing ${entries.length} new log entries`);
+		if (initialEntries.length > 0) {
+			console.log(`Processing ${initialEntries.length} existing entries from CSV...`);
 
-				// Process each entry
-				for (const entry of entries) {
+			// Process a batch of entries at a time to avoid overwhelming the system
+			const batchSize = 10;
+			for (let i = 0; i < initialEntries.length; i += batchSize) {
+				const batch = initialEntries.slice(i, i + batchSize);
+				console.log(`Processing batch ${i / batchSize + 1}/${Math.ceil(initialEntries.length / batchSize)}`);
+
+				for (const entry of batch) {
+					console.log('entry', entry);
 					await detectIntrusions(entry);
 				}
 			}
-		} catch (error) {
-			console.error('Error in detection cycle:', error);
+		} else {
+			console.log('No existing entries found in the log file.');
 		}
 
-		// Schedule next cycle after a short delay
-		setTimeout(runDetectionCycle, 5000);
-	};
+		console.log('Starting continuous monitoring...');
 
-	// Start the cycle
-	runDetectionCycle();
+		const runDetectionCycle = async () => {
+			try {
+				const newEntries = await readNewCSVLogEntries(logFilePath, filePosition);
+
+				if (newEntries.length > 0) {
+					console.log(`Processing ${newEntries.length} new entries from CSV...`);
+
+					for (const entry of newEntries) {
+						await detectIntrusions(entry);
+					}
+				}
+			} catch (error) {
+				console.error('Error in detection cycle:', error);
+			}
+		};
+
+		// Set up interval for continuous monitoring
+		setInterval(runDetectionCycle, 5000);
+		console.log('Detection system is now running. Checking for new entries every 5 seconds...');
+	} catch (error) {
+		console.error('Error starting detection:', error);
+		throw error;
+	}
 }
 
-// Main execution - start detection on the requests_responses.txt file
-const logFile = filePath('/public/requests_responses.txt');
-startDetection(logFile);
+// Start the detection system with the CSV file
+// startDetection(filePath('/public/ca_formatted_logs.csv')).catch(console.error);
 
-// Export for testing/external use
 export { SpecificationBasedDetection };

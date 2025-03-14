@@ -1,13 +1,18 @@
 // app/api/ca/sign_result/route.ts
 
+import { getResponseContent, getResponseMessage } from '@/constants/responseMessages';
 import { NextRequest, NextResponse } from 'next/server';
-import { getResponseMessage } from '@/constants/responseMessages';
 import { createSignedConsentList } from '@/utils/signatureGenerator';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@/utils/generateCSV';
-import { validateAuthorizationHeader } from '@/utils/validation';
 
 const prisma = new PrismaClient();
+
+const validateAuthorizationHeader = (header: string | null): boolean => {
+	if (!header) return false;
+	const [type, token] = header.split(' ');
+	return type === 'Bearer' && !!token;
+};
 
 export async function POST(req: NextRequest) {
 	const headers = req.headers;
@@ -26,52 +31,57 @@ export async function POST(req: NextRequest) {
 		url,
 		query,
 		headers: headersList,
+		body,
 	};
 
 	try {
 		if (!validateAuthorizationHeader(authorization)) {
-			const response = NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
-			await logger(
-				JSON.stringify(request),
-				JSON.stringify(body),
-				JSON.stringify(getResponseMessage('UNAUTHORIZED')),
-				'401'
-			);
-			return response;
+			const response = getResponseContent({
+				headers: {
+					xApiTranId: xApiTranId || '',
+					contentType: 'application/json;charset=UTF-8',
+				},
+				body: getResponseMessage('UNAUTHORIZED'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 401);
+			return NextResponse.json(response, { status: 401 });
 		}
 
 		// Validate x-api-tran-id
 		if (!xApiTranId || xApiTranId.length > 25) {
-			const response = NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
-			await logger(
-				JSON.stringify(request),
-				JSON.stringify(body),
-				JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')),
-				'400'
-			);
-			return response;
+			const response = getResponseContent({
+				headers: {
+					xApiTranId: xApiTranId || '',
+					contentType: 'application/json;charset=UTF-8',
+				},
+				body: getResponseMessage('INVALID_API_TRAN_ID'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 400);
+			return NextResponse.json(response, { status: 400 });
 		}
 
 		if (!cert_tx_id || cert_tx_id.length !== 40) {
-			const response = NextResponse.json(getResponseMessage('INVALID_CERT_TX_ID'), { status: 400 });
-			await logger(
-				JSON.stringify(request),
-				JSON.stringify(body),
-				JSON.stringify(getResponseMessage('INVALID_CERT_TX_ID')),
-				'400'
-			);
-			return response;
+			const response = getResponseContent({
+				headers: {
+					xApiTranId: xApiTranId || '',
+					contentType: 'application/json;charset=UTF-8',
+				},
+				body: getResponseMessage('INVALID_CERT_TX_ID'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 400);
+			return NextResponse.json(response, { status: 400 });
 		}
 
 		if (!sign_tx_id || sign_tx_id.length !== 49) {
-			const response = NextResponse.json(getResponseMessage('INVALID_SIGN_TX_ID'), { status: 400 });
-			await logger(
-				JSON.stringify(request),
-				JSON.stringify(body),
-				JSON.stringify(getResponseMessage('INVALID_SIGN_TX_ID')),
-				'400'
-			);
-			return response;
+			const response = getResponseContent({
+				headers: {
+					xApiTranId: xApiTranId || '',
+					contentType: 'application/json;charset=UTF-8',
+				},
+				body: getResponseMessage('INVALID_SIGN_TX_ID'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 400);
+			return NextResponse.json(response, { status: 400 });
 		}
 
 		// 3. Fetch consent list from the database
@@ -115,24 +125,45 @@ export async function POST(req: NextRequest) {
 			});
 		}
 
+		//format signed consent list
+		const signedConsentListFormatted = signedConsentList.map((signedConsent) => {
+			return {
+				signed_consent_len: signedConsent.signedConsentLen,
+				signed_consent: signedConsent.signedConsent,
+				tx_id: signedConsent.txId,
+				user_id: signedConsent.userId,
+				certificate_id: signedConsent.certificateId,
+			};
+		});
+
 		const responseData = {
-			cert_tx_id: cert_tx_id,
 			rsp_code: getResponseMessage('SUCCESS').code,
 			rsp_msg: getResponseMessage('SUCCESS').message,
+			signed_consent_cnt: signedConsentList.length,
+			signed_consent_list: signedConsentListFormatted,
 		};
 
-		await logger(JSON.stringify(request), JSON.stringify(body), JSON.stringify(responseData), '200');
+		const response = getResponseContent({
+			headers: {
+				xApiTranId: xApiTranId || '',
+				contentType: 'application/json;charset=UTF-8',
+			},
+			body: responseData,
+		});
 
-		return NextResponse.json(responseData, { status: 200 });
+		await logger(JSON.stringify(request), JSON.stringify(response), 200);
+
+		return NextResponse.json(response, { status: 200 });
 	} catch (error) {
-		const response = NextResponse.json(getResponseMessage('INTERNAL_SERVER_ERROR'), { status: 500 });
-		await logger(
-			JSON.stringify(request),
-			JSON.stringify(body),
-			JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')),
-			'500'
-		);
+		const response = getResponseContent({
+			headers: {
+				xApiTranId: xApiTranId || '',
+				contentType: 'application/json;charset=UTF-8',
+			},
+			body: getResponseMessage('INTERNAL_SERVER_ERROR'),
+		});
+		await logger(JSON.stringify(request), JSON.stringify(response), 500);
 		console.error('Error processing sign result:', error);
-		return response;
+		return NextResponse.json(response, { status: 500 });
 	}
 }

@@ -35,6 +35,13 @@ export default function SecuritySummary() {
 		};
 
 		fetchStats();
+
+		const interval = setInterval(() => {
+			console.log('fetching stats');
+			fetchStats();
+		}, 5000);
+
+		return () => clearInterval(interval);
 	}, []);
 
 	const chartData = [

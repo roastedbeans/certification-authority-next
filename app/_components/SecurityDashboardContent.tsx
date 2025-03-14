@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import Check from './check.js';
 import SecuritySummary from './SecuritySummary';
 import ApiLogsViewer from './ApiLogsViewer';
 import DetectionRuns from './DetectionRuns';
@@ -61,12 +60,6 @@ export default function SecurityDashboardContent() {
 				value='config'
 				className='outline-none'>
 				<DetectionConfig />
-			</Tabs.Content>
-
-			<Tabs.Content
-				value='check'
-				className='outline-none'>
-				<Check />
 			</Tabs.Content>
 		</Tabs.Root>
 	);
