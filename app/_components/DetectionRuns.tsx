@@ -9,11 +9,13 @@ import {
 	runRateLimitDetection,
 	DetectionResult,
 } from '../_actions/security-actions';
+import { DetectionSummary } from '@/scripts/runAnalysis';
 
 export default function DetectionRuns() {
 	const [loading, setLoading] = useState<string | null>(null);
 	const [result, setResult] = useState<DetectionResult | null>(null);
 	const [output, setOutput] = useState<string>('');
+	const [analysisSummary, setAnalysisSummary] = useState<DetectionSummary | null>(null);
 
 	const handleRun = async (
 		type: 'signature' | 'specification' | 'hybrid' | 'analysis' | 'ratelimit',
@@ -28,7 +30,14 @@ export default function DetectionRuns() {
 
 			console.log('result', result);
 			setResult(result);
-			setOutput(result.data || '');
+
+			if (type === 'analysis') {
+				setAnalysisSummary(result.data);
+				// Don't set output for analysis as it's a complex object
+				setOutput('Analysis complete. See summary below.');
+			} else {
+				setOutput(result.data || '');
+			}
 		} catch (error) {
 			// console.error(`Error running ${type} detection:`, error);
 			// setResult({
@@ -138,6 +147,246 @@ export default function DetectionRuns() {
 				<div className='bg-white dark:bg-gray-800 p-6 rounded-lg shadow'>
 					<h3 className='text-lg font-medium mb-2'>Output</h3>
 					<pre className='bg-gray-100 dark:bg-gray-900 p-4 rounded overflow-auto max-h-96 text-sm'>{output}</pre>
+				</div>
+			)}
+			{analysisSummary && (
+				<div className='bg-white dark:bg-gray-800 p-6 rounded-lg shadow'>
+					<h3 className='text-lg font-medium mb-4'>Analysis Summary</h3>
+					<div className='space-y-6'>
+						{/* Overview Stats */}
+						<div>
+							<h4 className='text-md font-medium mb-2'>Detection Overview</h4>
+							<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<p className='text-sm font-medium text-gray-500 dark:text-gray-400'>Total Attacks</p>
+									<p className='text-2xl font-bold'>{analysisSummary.attackCount || 0}</p>
+								</div>
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<p className='text-sm font-medium text-gray-500 dark:text-gray-400'>Missed Attacks</p>
+									<p className='text-2xl font-bold'>{analysisSummary.missedAttacks || 0}</p>
+								</div>
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<p className='text-sm font-medium text-gray-500 dark:text-gray-400'>Detection Rate</p>
+									<p className='text-2xl font-bold'>
+										{(analysisSummary.attackCount || 0) > 0
+											? `${(
+													(((analysisSummary.attackCount || 0) - (analysisSummary.missedAttacks || 0)) /
+														(analysisSummary.attackCount || 1)) *
+													100
+											  ).toFixed(1)}%`
+											: '0%'}
+									</p>
+								</div>
+							</div>
+						</div>
+
+						{/* Detection Method Stats */}
+						<div>
+							<h4 className='text-md font-medium mb-2'>Detection Methods</h4>
+							<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<p className='text-sm font-medium text-gray-500 dark:text-gray-400'>Signature Detections</p>
+									<p className='text-2xl font-bold'>{analysisSummary.sigDetectedCount || 0}</p>
+								</div>
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<p className='text-sm font-medium text-gray-500 dark:text-gray-400'>Specification Anomalies</p>
+									<p className='text-2xl font-bold'>{analysisSummary.specAnomalyCount || 0}</p>
+								</div>
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<p className='text-sm font-medium text-gray-500 dark:text-gray-400'>Hybrid Detections</p>
+									<p className='text-2xl font-bold'>{analysisSummary.hybridDetectedCount || 0}</p>
+								</div>
+							</div>
+						</div>
+
+						{/* Confusion Matrices */}
+						<div>
+							<h4 className='text-md font-medium mb-2'>Confusion Matrices</h4>
+							<div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
+								{/* Signature Matrix */}
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<h5 className='text-sm font-medium mb-3'>Signature-based Detection</h5>
+									<table className='min-w-full border text-sm'>
+										<thead>
+											<tr>
+												<th className='border p-2'></th>
+												<th className='border p-2'>Predicted Normal</th>
+												<th className='border p-2'>Predicted Anomaly</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr>
+												<th className='border p-2 text-left'>Actual Normal</th>
+												<td className='border p-2 text-center'>{analysisSummary.signatureMatrix?.trueNegative || 0}</td>
+												<td className='border p-2 text-center'>
+													{analysisSummary.signatureMatrix?.falsePositive || 0}
+												</td>
+											</tr>
+											<tr>
+												<th className='border p-2 text-left'>Actual Anomaly</th>
+												<td className='border p-2 text-center'>
+													{analysisSummary.signatureMatrix?.falseNegative || 0}
+												</td>
+												<td className='border p-2 text-center'>{analysisSummary.signatureMatrix?.truePositive || 0}</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+
+								{/* Specification Matrix */}
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<h5 className='text-sm font-medium mb-3'>Specification-based Detection</h5>
+									<table className='min-w-full border text-sm'>
+										<thead>
+											<tr>
+												<th className='border p-2'></th>
+												<th className='border p-2'>Predicted Normal</th>
+												<th className='border p-2'>Predicted Anomaly</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr>
+												<th className='border p-2 text-left'>Actual Normal</th>
+												<td className='border p-2 text-center'>
+													{analysisSummary.specificationMatrix?.trueNegative || 0}
+												</td>
+												<td className='border p-2 text-center'>
+													{analysisSummary.specificationMatrix?.falsePositive || 0}
+												</td>
+											</tr>
+											<tr>
+												<th className='border p-2 text-left'>Actual Anomaly</th>
+												<td className='border p-2 text-center'>
+													{analysisSummary.specificationMatrix?.falseNegative || 0}
+												</td>
+												<td className='border p-2 text-center'>
+													{analysisSummary.specificationMatrix?.truePositive || 0}
+												</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+
+								{/* Hybrid Matrix */}
+								<div className='bg-gray-100 dark:bg-gray-900 p-4 rounded'>
+									<h5 className='text-sm font-medium mb-3'>Hybrid Detection</h5>
+									<table className='min-w-full border text-sm'>
+										<thead>
+											<tr>
+												<th className='border p-2'></th>
+												<th className='border p-2'>Predicted Normal</th>
+												<th className='border p-2'>Predicted Anomaly</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr>
+												<th className='border p-2 text-left'>Actual Normal</th>
+												<td className='border p-2 text-center'>{analysisSummary.hybridMatrix?.trueNegative || 0}</td>
+												<td className='border p-2 text-center'>{analysisSummary.hybridMatrix?.falsePositive || 0}</td>
+											</tr>
+											<tr>
+												<th className='border p-2 text-left'>Actual Anomaly</th>
+												<td className='border p-2 text-center'>{analysisSummary.hybridMatrix?.falseNegative || 0}</td>
+												<td className='border p-2 text-center'>{analysisSummary.hybridMatrix?.truePositive || 0}</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+							</div>
+						</div>
+
+						{/* Performance Metrics */}
+						<div>
+							<h4 className='text-md font-medium mb-2'>Performance Metrics</h4>
+							<div className='overflow-x-auto'>
+								<table className='min-w-full border text-sm'>
+									<thead>
+										<tr>
+											<th className='border p-2'>Detection Method</th>
+											<th className='border p-2'>Accuracy</th>
+											<th className='border p-2'>Precision</th>
+											<th className='border p-2'>Recall</th>
+											<th className='border p-2'>F1 Score</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<th className='border p-2 text-left'>Signature-based</th>
+											<td className='border p-2'>
+												{((analysisSummary.signatureMetrics?.accuracy || 0) * 100).toFixed(2)}%
+											</td>
+											<td className='border p-2'>
+												{((analysisSummary.signatureMetrics?.precision || 0) * 100).toFixed(2)}%
+											</td>
+											<td className='border p-2'>
+												{((analysisSummary.signatureMetrics?.recall || 0) * 100).toFixed(2)}%
+											</td>
+											<td className='border p-2'>
+												{((analysisSummary.signatureMetrics?.f1Score || 0) * 100).toFixed(2)}%
+											</td>
+										</tr>
+										<tr>
+											<th className='border p-2 text-left'>Specification-based</th>
+											<td className='border p-2'>
+												{((analysisSummary.specificationMetrics?.accuracy || 0) * 100).toFixed(2)}%
+											</td>
+											<td className='border p-2'>
+												{((analysisSummary.specificationMetrics?.precision || 0) * 100).toFixed(2)}%
+											</td>
+											<td className='border p-2'>
+												{((analysisSummary.specificationMetrics?.recall || 0) * 100).toFixed(2)}%
+											</td>
+											<td className='border p-2'>
+												{((analysisSummary.specificationMetrics?.f1Score || 0) * 100).toFixed(2)}%
+											</td>
+										</tr>
+										<tr>
+											<th className='border p-2 text-left'>Hybrid</th>
+											<td className='border p-2'>
+												{((analysisSummary.hybridMetrics?.accuracy || 0) * 100).toFixed(2)}%
+											</td>
+											<td className='border p-2'>
+												{((analysisSummary.hybridMetrics?.precision || 0) * 100).toFixed(2)}%
+											</td>
+											<td className='border p-2'>{((analysisSummary.hybridMetrics?.recall || 0) * 100).toFixed(2)}%</td>
+											<td className='border p-2'>
+												{((analysisSummary.hybridMetrics?.f1Score || 0) * 100).toFixed(2)}%
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+
+						{/* Recent Attacks */}
+						{analysisSummary.recentAttacks && analysisSummary.recentAttacks.length > 0 && (
+							<div>
+								<h4 className='text-md font-medium mb-2'>Recent Attacks</h4>
+								<div className='overflow-x-auto'>
+									<table className='min-w-full border text-sm'>
+										<thead>
+											<tr>
+												<th className='border p-2'>Index</th>
+												<th className='border p-2'>Attack Type</th>
+												<th className='border p-2'>Method</th>
+												<th className='border p-2'>URL</th>
+											</tr>
+										</thead>
+										<tbody>
+											{analysisSummary.recentAttacks.map((attack, index) => (
+												<tr key={index}>
+													<td className='border p-2'>{attack.index !== undefined ? attack.index : 'N/A'}</td>
+													<td className='border p-2'>{attack['attack.type'] || 'Unknown'}</td>
+													<td className='border p-2'>{attack['request.method'] || 'N/A'}</td>
+													<td className='border p-2 truncate max-w-xs'>{attack['request.url'] || 'N/A'}</td>
+												</tr>
+											))}
+										</tbody>
+									</table>
+								</div>
+							</div>
+						)}
+					</div>
 				</div>
 			)}
 		</div>

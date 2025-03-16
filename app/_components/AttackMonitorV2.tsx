@@ -1,10 +1,9 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import Papa from 'papaparse';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, ShieldCheck, ShieldAlert, Activity, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { LogRecord } from './AttackMonitor';
 
 // Interfaces and type definitions
@@ -127,7 +126,16 @@ const ConfusionMatrixVisualizer = ({
 			setSignatureLogs(signatureLogsData);
 			setHybridLogs(hybridLogsData);
 		}
-	}, [logsData, specificationLogsData, signatureLogsData, hybridLogsData]);
+	}, [
+		logsData,
+		specificationLogsData,
+		signatureLogsData,
+		hybridLogsData,
+		logs,
+		specificationLogs,
+		signatureLogs,
+		hybridLogs,
+	]);
 
 	// Fixed function that properly populates all matrix cells
 	const generateConfusionMatrix = (detectionLogs: LogRecord[], mainLogs: CALogRecord[]): ConfusionMatrix => {

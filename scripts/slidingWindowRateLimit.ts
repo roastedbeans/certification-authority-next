@@ -1,17 +1,21 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { LogEntry } from './types';
+import {
+	LogEntry,
+	DetectionResult,
+	filePath,
+	initializeCSV,
+	readNewCSVLogEntries,
+	FilePosition,
+	logDetectionResult,
+} from './utils';
 
 /**
- * Focused Rate Limiting Implementation Using Sliding Window Strategy
+ * Enhanced Rate Limiting Implementation Using Sliding Window Strategy
  *
- * This implementation specifically focuses on the sliding window rate limiting strategy
- * for analyzing logs from requests_responses.txt and detecting rate limit violations.
+ * This implementation integrates with the detection framework to analyze logs
+ * and detect rate limit violations using the sliding window approach.
  */
-
-// File paths
-const LOG_FILE_PATH = path.join(process.cwd(), 'public', 'requests_responses.txt');
-const DETECTION_LOG_PATH = path.join(process.cwd(), 'logs', 'rate_limit_detection.csv');
 
 // Types for rate limiting
 export interface RateLimitResult {
@@ -47,35 +51,74 @@ export interface RateLimitConfig {
 const defaultConfig: RateLimitConfig = {
 	enabled: true,
 
+	// Using a more flexible approach for client limits
 	clientRateLimits: {
-		// Example client-specific limits
-		anya123456: {
-			requestsPerMinute: 30, // Stricter limit for specific client
+		// This will be used as a fallback for known clients
+		'default-premium-client': {
+			requestsPerMinute: 30, // Example limit for premium clients
 		},
 	},
 
 	endpointRateLimits: {
-		// Example endpoint-specific limits
+		// Authentication endpoints - stricter limits to prevent abuse
 		'/api/v2/mgmts/oauth/2.0/token': {
-			requestsPerMinute: 5, // Stricter limit for authentication endpoint
+			requestsPerMinute: 10,
 		},
 		'/api/oauth/2.0/token': {
-			requestsPerMinute: 5, // Stricter limit for authentication endpoint
-		},
-		'/api/ca/sign_request': {
 			requestsPerMinute: 10,
+		},
+		// Certificate management endpoints
+		'/api/ca/sign_request': {
+			requestsPerMinute: 20,
+		},
+		'/api/ca/sign_result': {
+			requestsPerMinute: 20,
+		},
+		'/api/ca/sign_verification': {
+			requestsPerMinute: 30,
+		},
+		// Organization management endpoints
+		'/api/v2/mgmts/orgs': {
+			requestsPerMinute: 30,
 		},
 	},
 
 	defaultRequestsPerMinute: 20,
 };
 
+// Client categories with their rate limits
+const clientCategories = {
+	premium: 30, // Premium clients get higher limits
+	standard: 20, // Standard clients get default limits
+	restricted: 10, // Restricted clients get lower limits
+};
+
+// Function to determine client rate limit
+function getClientRateLimit(clientId: string): number {
+	// 1. Check if client has a specific limit in the config
+	if (defaultConfig.clientRateLimits[clientId]) {
+		return defaultConfig.clientRateLimits[clientId].requestsPerMinute;
+	}
+
+	// 2. Check client category based on prefix or pattern
+	if (clientId.startsWith('premium-') || clientId.includes('-prem-')) {
+		return clientCategories.premium;
+	}
+
+	if (clientId.startsWith('restricted-') || clientId.includes('-rest-')) {
+		return clientCategories.restricted;
+	}
+
+	// 3. Default to standard rate
+	return clientCategories.standard;
+}
+
 /**
  * Sliding Window Rate Limiter
  * This class implements the sliding window algorithm for rate limiting
  */
 export class SlidingWindowRateLimiter {
-	private readonly config: RateLimitConfig;
+	public readonly config: RateLimitConfig;
 	private readonly requestStore: Map<string, number[]>;
 
 	constructor(config: Partial<RateLimitConfig> = {}) {
@@ -102,7 +145,12 @@ export class SlidingWindowRateLimiter {
 		const clientCheck = this.checkSlidingWindowLimit(`client:${clientId}`, this.getClientLimit(clientId), timestamp);
 
 		if (clientCheck.exceeded) {
-			return clientCheck;
+			return {
+				exceeded: true,
+				reason: `Client ${clientId} exceeded rate limit of ${this.getClientLimit(clientId)} requests per minute`,
+				remaining: clientCheck.remaining,
+				resetAt: clientCheck.resetAt,
+			};
 		}
 
 		// Check endpoint-specific rate limit
@@ -113,7 +161,14 @@ export class SlidingWindowRateLimiter {
 		);
 
 		if (endpointCheck.exceeded) {
-			return endpointCheck;
+			return {
+				exceeded: true,
+				reason: `Client ${clientId} exceeded rate limit of ${this.getEndpointLimit(
+					endpoint
+				)} requests per minute for endpoint ${endpoint}`,
+				remaining: endpointCheck.remaining,
+				resetAt: endpointCheck.resetAt,
+			};
 		}
 
 		// If all checks pass, return the remaining count from the more restrictive limit
@@ -175,23 +230,44 @@ export class SlidingWindowRateLimiter {
 	/**
 	 * Extract the client ID from the log entry
 	 */
-	private extractClientId(entry: LogEntry): string {
-		// Use the first 10 characters of x-api-tran-id as client ID
-		const transactionId = entry.request['x-api-tran-id'] || '';
-		return transactionId.substring(0, 10);
+	public extractClientId(entry: LogEntry): string {
+		// Try to extract from x-api-tran-id first
+		if (entry.request && entry.request['x-api-tran-id']) {
+			const transactionId = entry.request['x-api-tran-id'] || '';
+			return transactionId.substring(0, 10);
+		}
+
+		// Try to extract from various other common fields
+		if (entry.request) {
+			if (entry.request['x-api-key']) return String(entry.request['x-api-key']);
+			if (entry.request['clientId']) return String(entry.request['clientId']);
+			if (entry.request['client_id']) return String(entry.request['client_id']);
+		}
+
+		// Fallback to IP address or generate random ID
+		if (entry.request && entry.request['ip']) {
+			return String(entry.request['ip']);
+		}
+
+		// Generate a random ID as last resort
+		return `unknown-${Math.random().toString(36).substring(2, 10)}`;
 	}
 
 	/**
 	 * Extract the endpoint from the log entry URL
 	 */
-	private extractEndpoint(entry: LogEntry): string {
+	public extractEndpoint(entry: LogEntry): string {
+		if (!entry.request || !entry.request.url) {
+			return 'unknown-endpoint';
+		}
+
 		try {
 			const url = new URL(entry.request.url);
 			return url.pathname;
 		} catch (e) {
 			// If URL parsing fails, extract path part from the URL string
 			const urlPath = entry.request.url.split('?')[0];
-			return urlPath;
+			return urlPath || 'unknown-endpoint';
 		}
 	}
 
@@ -199,8 +275,12 @@ export class SlidingWindowRateLimiter {
 	 * Extract the timestamp from the log entry
 	 */
 	public extractTimestamp(entry: LogEntry): number {
-		// In a real implementation, we would use the timestamp from the log
-		// For this example, use current time if not available in the log
+		// If timestamp is provided in the entry, use it
+		if (entry.timestamp) {
+			return new Date(entry.timestamp).getTime();
+		}
+
+		// Otherwise fall back to current time
 		return Date.now();
 	}
 
@@ -208,8 +288,8 @@ export class SlidingWindowRateLimiter {
 	 * Get the rate limit for a specific client
 	 */
 	private getClientLimit(clientId: string): number {
-		const clientConfig = this.config.clientRateLimits[clientId];
-		return clientConfig ? clientConfig.requestsPerMinute : this.config.defaultRequestsPerMinute;
+		// Use the dynamic client rate limit function
+		return getClientRateLimit(clientId);
 	}
 
 	/**
@@ -221,131 +301,312 @@ export class SlidingWindowRateLimiter {
 	}
 }
 
-/**
- * Parse a log line into a LogEntry object
- */
-export function parseLogLine(line: string): LogEntry | null {
-	try {
-		// Format from requests_responses.txt is:
-		// ||[timestamp] [request {...}] [response {...}]
-		const parts = line.split('[');
-
-		if (parts.length < 4) return null;
-
-		const requestPart = '[' + parts[2];
-		const responsePart = '[' + parts[3];
-
-		// Extract and parse the request and response JSON
-		const requestMatch = requestPart.match(/\[request (.*?)\]/);
-		const responseMatch = responsePart.match(/\[response (.*?)\]/);
-
-		if (!requestMatch || !responseMatch) return null;
-
-		const request = JSON.parse(requestMatch[1]);
-		const response = JSON.parse(responseMatch[1]);
-
-		return { request, response };
-	} catch (e) {
-		console.error('Error parsing log line:', e);
-		return null;
-	}
+// Add new interfaces for timeframe analysis
+export interface TimeframeAnalysis {
+	startTime: Date;
+	endTime: Date;
+	isAnomaly: boolean;
+	reason: string;
+	requestCount: number;
+	clientId: string;
+	endpoint?: string;
 }
 
 /**
- * Parse the timestamp from the log line
+ * Analyzes a timeframe for rate limit anomalies
+ * @param timeframe The timeframe to analyze
+ * @param requestStore Map containing sliding window data for rate limit analysis
+ * @returns DetectionResult indicating if an anomaly was detected
  */
-export function parseTimestamp(line: string): Date | null {
-	try {
-		const timestampMatch = line.match(/\|\|\[(.*?)\]/);
-		if (!timestampMatch) return null;
+function analyzeTimeframeAnomaly(timeframe: TimeframeAnalysis, requestStore: Map<string, number[]>): DetectionResult {
+	// Calculate requests per minute for this timeframe
+	const timeframeDurationMinutes = 5; // 5-minute timeframe
+	const requestsPerMinute = timeframe.requestCount / timeframeDurationMinutes;
 
-		return new Date(timestampMatch[1]);
-	} catch (e) {
-		console.error('Error parsing timestamp:', e);
-		return null;
+	// Get rate limits for this client and endpoint
+	const clientLimit = getClientRateLimit(timeframe.clientId);
+	let endpointLimit = defaultConfig.defaultRequestsPerMinute;
+
+	if (timeframe.endpoint && defaultConfig.endpointRateLimits[timeframe.endpoint]) {
+		endpointLimit = defaultConfig.endpointRateLimits[timeframe.endpoint].requestsPerMinute;
 	}
+
+	// Determine the applicable limit (most restrictive applies)
+	const applicableLimit = Math.min(clientLimit, endpointLimit);
+
+	// Check for anomalies
+	if (requestsPerMinute > applicableLimit * 0.8) {
+		return {
+			detected: true,
+			reason: `High sustained traffic: ${requestsPerMinute.toFixed(1)} req/min (limit: ${applicableLimit} req/min)`,
+		};
+	}
+
+	// Look for minute-by-minute spikes using the sliding window data
+	const clientKey = `client:${timeframe.clientId}`;
+	const endpointKey = `endpoint:${timeframe.endpoint}:${timeframe.clientId}`;
+
+	// Check if we have sliding window data for this client/endpoint
+	if (requestStore.has(clientKey)) {
+		const minuteCount = requestStore.get(clientKey)!.length;
+		if (minuteCount > clientLimit) {
+			return {
+				detected: true,
+				reason: `Client rate limit exceeded: ${minuteCount} requests in last minute (limit: ${clientLimit})`,
+			};
+		}
+	}
+
+	if (requestStore.has(endpointKey)) {
+		const minuteCount = requestStore.get(endpointKey)!.length;
+		if (minuteCount > endpointLimit) {
+			return {
+				detected: true,
+				reason: `Endpoint rate limit exceeded: ${minuteCount} requests in last minute to ${timeframe.endpoint} (limit: ${endpointLimit})`,
+			};
+		}
+	}
+
+	// No anomalies detected
+	return {
+		detected: false,
+		reason: 'Normal traffic pattern',
+	};
 }
 
 /**
- * Read log file and apply rate limiting
+ * Integration with detection system - can be called from security-actions.ts
+ * This is the main entry point for rate limit detection
+ * Returns "done" on success or an error message on failure
  */
-export async function analyzeLogsWithRateLimit(logFilePath: string = LOG_FILE_PATH): Promise<void> {
-	// Ensure log directory exists
-	const logDir = path.dirname(DETECTION_LOG_PATH);
-	if (!fs.existsSync(logDir)) {
-		fs.mkdirSync(logDir, { recursive: true });
-	}
-
-	// Initialize CSV with headers if it doesn't exist
-	if (!fs.existsSync(DETECTION_LOG_PATH)) {
-		const headers = 'timestamp,detectionType,detected,reason,request,response\n';
-		fs.writeFileSync(DETECTION_LOG_PATH, headers);
-	}
+export async function startRateLimitDetection(
+	logFilePath = filePath('/public/ca_formatted_logs.csv')
+): Promise<string> {
+	const DETECTION_LOG_PATH = filePath('/public/rate_limit_intrusions.csv');
 
 	try {
-		// Read the entire log file
-		const logContent = fs.readFileSync(logFilePath, 'utf8');
-		const logLines = logContent.split('\n').filter((line) => line.trim() !== '');
+		// Initialize detection log CSV if it doesn't exist
+		await initializeCSV(DETECTION_LOG_PATH, 'ratelimit');
 
-		// Create rate limiter instance
-		const rateLimiter = new SlidingWindowRateLimiter();
+		const filePosition = new FilePosition();
 
-		// Process each log line
-		for (const line of logLines) {
-			const entry = parseLogLine(line);
-			if (!entry) continue;
+		// First, read the entire file initially to catch up
+		console.log('Initial reading of the log file...');
+		const initialEntries = await readNewCSVLogEntries(logFilePath, filePosition);
 
-			// Extract timestamp for more accurate rate limiting
-			const timestamp = parseTimestamp(line);
-			if (timestamp) {
-				// Override the timestamp extraction method for accurate historical analysis
-				const originalExtractMethod = rateLimiter.extractTimestamp;
-				// Use a function that returns the timestamp from the log
-				rateLimiter.extractTimestamp = () => timestamp.getTime();
+		if (initialEntries.length > 0) {
+			console.log(`Processing ${initialEntries.length} existing entries from CSV...`);
+
+			// Create rate limiter instance with default configuration
+			const rateLimiter = new SlidingWindowRateLimiter();
+
+			// Track client request counts by minute for sliding window analysis
+			const requestStore = new Map<string, number[]>();
+
+			// Track timeframes for analysis
+			const timeframes = new Map<string, TimeframeAnalysis>();
+			const timeframeWindow = 300000; // 5 minutes in milliseconds
+
+			// Process a batch of entries at a time
+			const batchSize = 50;
+			for (let i = 0; i < initialEntries.length; i += batchSize) {
+				const batch = initialEntries.slice(i, i + batchSize);
+				console.log(
+					`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(initialEntries.length / batchSize)}`
+				);
+
+				for (const entry of batch) {
+					// Extract client and endpoint info
+					const clientId = rateLimiter.extractClientId(entry);
+					const endpoint = rateLimiter.extractEndpoint(entry);
+					const timestamp = rateLimiter.extractTimestamp(entry);
+
+					// Create sanitized IDs for timeframe key
+					const sanitizedClientId = clientId.startsWith('unknown-') ? 'unknown-client' : clientId;
+					const timeframeEndpoint = endpoint === 'unknown-endpoint' ? 'unknown-endpoint' : endpoint;
+					const timeframeTime = Math.floor(timestamp / timeframeWindow) * timeframeWindow;
+					const timeframeKey = `${sanitizedClientId}:${timeframeEndpoint}:${timeframeTime}`;
+
+					// Track client requests for this timeframe
+					if (!timeframes.has(timeframeKey)) {
+						// Initialize a new timeframe
+						timeframes.set(timeframeKey, {
+							startTime: new Date(timeframeTime),
+							endTime: new Date(timeframeTime + timeframeWindow),
+							isAnomaly: false,
+							reason: 'Normal traffic pattern',
+							requestCount: 1,
+							clientId: sanitizedClientId,
+							endpoint: timeframeEndpoint,
+						});
+					} else {
+						// Update existing timeframe
+						const timeframe = timeframes.get(timeframeKey)!;
+						timeframe.requestCount++;
+
+						// Update the map
+						timeframes.set(timeframeKey, timeframe);
+					}
+
+					// Update sliding window data structure for rate limit analysis
+					// Maintain separate tracking for minute-by-minute analysis (sliding window)
+					// We'll use this to determine the actual rate limits
+					const clientKey = `client:${clientId}`;
+					const endpointKey = `endpoint:${endpoint}:${clientId}`;
+					const minuteWindow = 60000; // 1 minute window
+
+					// Initialize client tracking if needed
+					if (!requestStore.has(clientKey)) {
+						requestStore.set(clientKey, []);
+					}
+
+					// Initialize endpoint tracking if needed
+					if (!requestStore.has(endpointKey)) {
+						requestStore.set(endpointKey, []);
+					}
+
+					// Get existing timestamps
+					const clientTimestamps = requestStore.get(clientKey)!;
+					const endpointTimestamps = requestStore.get(endpointKey)!;
+
+					// Add current timestamp
+					clientTimestamps.push(timestamp);
+					endpointTimestamps.push(timestamp);
+
+					// Filter out old timestamps (older than 1 minute)
+					const validClientTimestamps = clientTimestamps.filter((ts) => timestamp - ts <= minuteWindow);
+					const validEndpointTimestamps = endpointTimestamps.filter((ts) => timestamp - ts <= minuteWindow);
+
+					// Update the request store
+					requestStore.set(clientKey, validClientTimestamps);
+					requestStore.set(endpointKey, validEndpointTimestamps);
+				}
 			}
 
-			// Check rate limit
-			const result = rateLimiter.checkRateLimit(entry);
+			// Analyze timeframes for anomalies and log intrusions
+			console.log(`Analyzing ${timeframes.size} timeframes for rate limit anomalies...`);
+			let anomalyCount = 0;
 
-			// Log rate limit violations
-			if (result.exceeded) {
-				await logRateLimitViolation(entry, result, timestamp);
-				console.log(`[RATE LIMIT VIOLATION] ${result.reason}`);
+			// Process each timeframe
+			for (const [key, timeframe] of timeframes.entries()) {
+				// Calculate requests per minute for this timeframe
+				const timeframeDurationMinutes = timeframeWindow / 60000; // Convert ms to minutes
+				const requestsPerMinute = timeframe.requestCount / timeframeDurationMinutes;
+
+				// Get rate limits for this client and endpoint
+				const clientLimit = getClientRateLimit(timeframe.clientId);
+				let endpointLimit = rateLimiter.config.defaultRequestsPerMinute;
+
+				if (timeframe.endpoint && rateLimiter.config.endpointRateLimits[timeframe.endpoint]) {
+					endpointLimit = rateLimiter.config.endpointRateLimits[timeframe.endpoint].requestsPerMinute;
+				}
+
+				// Determine the applicable limit (most restrictive applies)
+				const applicableLimit = Math.min(clientLimit, endpointLimit);
+
+				// Determine if this is an anomaly
+				let isAnomaly = false;
+				let reason = 'Normal traffic pattern';
+
+				// First check: Sustained traffic exceeding 80% of the limit is suspicious
+				if (requestsPerMinute > applicableLimit * 0.8) {
+					isAnomaly = true;
+					reason = `High sustained traffic: ${requestsPerMinute.toFixed(
+						1
+					)} req/min (limit: ${applicableLimit} req/min)`;
+				}
+
+				// Second check: Look for minute-by-minute spikes using the sliding window data
+				const clientKey = `client:${timeframe.clientId}`;
+				const endpointKey = `endpoint:${timeframe.endpoint}:${timeframe.clientId}`;
+
+				// Check if we have sliding window data for this client/endpoint
+				if (requestStore.has(clientKey)) {
+					const minuteCount = requestStore.get(clientKey)!.length;
+					if (minuteCount > clientLimit) {
+						isAnomaly = true;
+						reason = `Client rate limit exceeded: ${minuteCount} requests in last minute (limit: ${clientLimit})`;
+					}
+				}
+
+				if (requestStore.has(endpointKey)) {
+					const minuteCount = requestStore.get(endpointKey)!.length;
+					if (minuteCount > endpointLimit) {
+						isAnomaly = true;
+						reason = `Endpoint rate limit exceeded: ${minuteCount} requests in last minute to ${timeframe.endpoint} (limit: ${endpointLimit})`;
+					}
+				}
+
+				// Update the timeframe status
+				timeframe.isAnomaly = isAnomaly;
+				timeframe.reason = reason;
+
+				// Log intrusions to the detection log
+				if (isAnomaly) {
+					anomalyCount++;
+
+					const entry: LogEntry = {
+						timestamp: timeframe.startTime.toISOString(),
+						request: {
+							url: timeframe.endpoint || 'unknown-endpoint',
+							method: 'GET',
+							authorization: '',
+							'user-agent': 'rate-limit-detector',
+							'x-api-tran-id': `${timeframe.clientId}-${Date.now()}`,
+							'x-api-type': 'system',
+							'x-csrf-token': '',
+							cookie: '',
+							'set-cookie': '',
+							'content-length': '0',
+							body: '',
+						},
+						response: {
+							status: '429',
+							'x-api-tran-id': `${timeframe.clientId}-${Date.now()}`,
+							'content-type': 'application/json',
+							body: JSON.stringify({
+								error: 'Too Many Requests',
+							}),
+						},
+					};
+					// Create a synthetic log entry for the timeframe
+					const detectionResult: DetectionResult = {
+						detected: true,
+						reason: reason,
+					};
+
+					await logDetectionResult(entry, 'ratelimit', detectionResult);
+
+					// Also append to our main detection log in a more readable format
+					const logLine = `${timeframe.startTime.toISOString()},ratelimit,true,${reason.replace(/,/g, ';')},${
+						timeframe.clientId
+					},${timeframe.endpoint || ''},${
+						timeframe.requestCount
+					},${timeframe.startTime.toISOString()},${timeframe.endTime.toISOString()}\n`;
+
+					fs.appendFileSync(DETECTION_LOG_PATH, logLine);
+
+					console.log(`⚠️ RATE LIMIT ANOMALY DETECTED ⚠️`);
+					console.log(`Timeframe: ${timeframe.startTime.toISOString()} to ${timeframe.endTime.toISOString()}`);
+					console.log(`Client: ${timeframe.clientId}, Endpoint: ${timeframe.endpoint}`);
+					console.log(`Reason: ${reason}`);
+					console.log(`Request count: ${timeframe.requestCount} (${requestsPerMinute.toFixed(1)} req/min)`);
+					console.log(`Applicable limit: ${applicableLimit} req/min`);
+					console.log('-----------------------------------------------------');
+				}
 			}
+
+			console.log(
+				`Rate limit analysis completed. Found ${anomalyCount} anomalies out of ${timeframes.size} timeframes.`
+			);
+			console.log(`Results written to: ${DETECTION_LOG_PATH}`);
+		} else {
+			console.log('No existing entries found in the log file.');
 		}
 
-		console.log('Rate limit analysis completed. Results written to:', DETECTION_LOG_PATH);
+		return 'done';
 	} catch (error) {
-		console.error('Error analyzing logs:', error);
+		console.error('Error in rate limit detection:', error);
+		return String(error);
 	}
-}
-
-/**
- * Log rate limit violations to CSV
- */
-async function logRateLimitViolation(entry: LogEntry, result: RateLimitResult, timestamp: Date | null): Promise<void> {
-	const logTimestamp = timestamp ? timestamp.toISOString() : new Date().toISOString();
-
-	const record = {
-		timestamp: logTimestamp,
-		detectionType: 'RateLimit',
-		detected: result.exceeded,
-		reason: result.reason,
-		request: JSON.stringify(entry.request),
-		response: JSON.stringify(entry.response),
-	};
-
-	const csvLine = `${record.timestamp},${record.detectionType},${record.detected},${record.reason.replace(
-		/,/g,
-		';'
-	)},${record.request.replace(/,/g, ';')},${record.response.replace(/,/g, ';')}\n`;
-
-	fs.appendFileSync(DETECTION_LOG_PATH, csvLine);
-}
-
-// Run the analysis if this file is executed directly
-if (require.main === module) {
-	analyzeLogsWithRateLimit()
-		.then(() => console.log('Analysis complete'))
-		.catch((err) => console.error('Error:', err));
 }

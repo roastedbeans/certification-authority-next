@@ -1,34 +1,18 @@
-import { createObjectCsvWriter as createCsvWriter } from 'csv-writer';
-import { parse as csvParse } from 'csv-parse/sync';
-import fs from 'fs';
 import { z } from 'zod';
 import {
 	LogEntry,
-	RequestData,
-	ResponseData,
 	DetectionResult,
-	LogRecord,
 	filePath,
+	initializeCSV,
+	readNewCSVLogEntries,
+	FilePosition,
+	logDetectionResult,
+	RequestData,
 	detectionCSVLoggerHeader,
 } from './utils';
-class FilePosition {
-	private position: number;
-
-	constructor() {
-		this.position = 0;
-	}
-
-	getPosition(): number {
-		return this.position;
-	}
-
-	setPosition(pos: number): void {
-		this.position = pos;
-	}
-}
 
 // Specification-based Detection Implementation
-class SpecificationBasedDetection {
+export class SpecificationBasedDetection {
 	private static readonly defaultRequestHeadersSchema = z.object({
 		'content-length': z.string().max(10, {
 			message: 'Content-Length does NOT match the specification, possible Buffer Overflow Attack or Request Smuggling',
@@ -623,146 +607,6 @@ class SpecificationBasedDetection {
 	}
 }
 
-// Log Processing Functions for CSV format
-async function readNewCSVLogEntries(filePath: string, filePosition: FilePosition): Promise<LogEntry[]> {
-	try {
-		// Check if file exists
-		if (!fs.existsSync(filePath)) {
-			return [];
-		}
-
-		// Read file stats
-		const stats = fs.statSync(filePath);
-
-		// If no new data, return empty array
-		if (stats.size <= filePosition.getPosition()) {
-			return [];
-		}
-
-		// Read new data from file
-		const fileData = fs.readFileSync(filePath, 'utf-8');
-		const currentPosition = filePosition.getPosition();
-		const newData = fileData.slice(currentPosition);
-
-		// Update file position
-		filePosition.setPosition(stats.size);
-
-		// If no new data, return empty array
-		if (!newData.trim()) {
-			return [];
-		}
-
-		// Parse CSV data directly with headers in the file
-		const records = csvParse(newData, {
-			columns: true,
-			skip_empty_lines: true,
-			relax_column_count: true, // Handle potential inconsistencies in CSV
-		});
-
-		// Convert CSV records to LogEntry format
-		return records.map((record: any) => {
-			// Add logging for debugging
-			console.log('Processing CSV record:', record['request.url']);
-			console.log('record', record);
-
-			// Map CSV fields to the format expected by the detection system
-			const request: RequestData = {
-				url: record['request.url'] || '',
-				method: record['request.method'] || 'GET', // Default to GET if missing
-				authorization: record['request.headers.authorization'] || '',
-				'user-agent': record['request.headers.user-agent'] || '',
-				'x-api-tran-id': record['request.headers.x-api-tran-id'] || '',
-				'x-api-type': record['request.headers.x-api-type'] || '',
-				'x-csrf-token': record['request.headers.x-csrf-token'] || '',
-				cookie: record['request.headers.cookie'] || '',
-				'set-cookie': record['request.headers.set_cookie'] || '',
-				'content-type': record['request.headers.content-type'] || '',
-				'content-length': record['request.headers.content-length'] || '0', // Default to 0 if missing
-				body: record['request.body'] || '',
-			};
-
-			// Parse request body if it's a JSON string
-			try {
-				if (request.body && typeof request.body === 'string' && request.body.trim().startsWith('{')) {
-					request.body = JSON.parse(request.body);
-				}
-			} catch (error) {
-				console.warn('Failed to parse request body as JSON:', error);
-			}
-
-			// Ensure response status is included
-			const response: ResponseData = {
-				'x-api-tran-id': record['response.headers.x-api-tran-id'] || '',
-				'content-type': record['response.headers.content-type'] || '',
-				status: record['response.status'] || '',
-				body: record['response.body'] || '',
-			};
-
-			// Parse response body if it's a JSON string
-			try {
-				if (response.body && typeof response.body === 'string' && response.body.trim().startsWith('{')) {
-					response.body = JSON.parse(response.body);
-				}
-			} catch (error) {
-				console.warn('Failed to parse response body as JSON:', error);
-			}
-
-			// Add response status to response object
-			if (record['response.status']) {
-				(response as any)['status'] = record['response.status'];
-			}
-
-			// Include attack type which may be useful for detection
-			if (record['attack.type']) {
-				request['attack-type'] = record['attack.type'];
-			}
-
-			return {
-				request,
-				response,
-				requestBody: request.body,
-				responseBody: response.body,
-			};
-		});
-	} catch (error) {
-		console.error('Error reading CSV log entries:', error);
-		return [];
-	}
-}
-
-// Logging Function
-async function logDetectionResult(
-	entry: LogEntry,
-	detectionType: 'Specification',
-	result: DetectionResult
-): Promise<void> {
-	if (!fs.existsSync(filePath('/public/specification_detection_logs.csv'))) {
-		fs.writeFileSync(
-			filePath('/public/specification_detection_logs.csv'),
-			'timestamp,detectionType,detected,reason,request,response\n'
-		);
-	}
-
-	const csvWriter2 = createCsvWriter({
-		path: filePath('/public/specification_detection_logs.csv'),
-		append: true,
-		header: detectionCSVLoggerHeader,
-	});
-
-	console.log('entry.request', entry.request);
-
-	const record: LogRecord = {
-		timestamp: new Date().toISOString(),
-		detectionType,
-		detected: result.detected,
-		reason: result.reason,
-		request: JSON.stringify(entry.request),
-		response: JSON.stringify(entry.response),
-	};
-
-	await csvWriter2.writeRecords([record]);
-}
-
 // Main Detection Function
 async function detectIntrusions(entry: LogEntry): Promise<void> {
 	try {
@@ -773,13 +617,13 @@ async function detectIntrusions(entry: LogEntry): Promise<void> {
 		const specificationResult = specificationDetector.detect(entry);
 
 		if (specificationResult.detected) {
-			await logDetectionResult(entry, 'Specification', specificationResult);
+			await logDetectionResult(entry, 'specification', specificationResult);
 			console.log('⚠️ INTRUSION DETECTED ⚠️');
 			console.log(`Reason: ${specificationResult.reason}`);
 			console.log(`URL: ${entry.request.url}`);
 			console.log(`Method: ${entry.request.method}`);
 		} else {
-			await logDetectionResult(entry, 'Specification', specificationResult);
+			await logDetectionResult(entry, 'specification', specificationResult);
 			console.log('✅ Request conforms to specifications');
 		}
 		console.log('--------------------------------------------------');
@@ -789,25 +633,14 @@ async function detectIntrusions(entry: LogEntry): Promise<void> {
 			detected: true,
 			reason: `Error processing entry: ${(error as Error).message}`,
 		};
-		await logDetectionResult(entry, 'Specification', errorResult);
-	}
-}
-
-// Initialize CSV
-async function initializeCSV(filePath: string): Promise<void> {
-	if (!fs.existsSync(filePath)) {
-		const csvWriter = createCsvWriter({
-			path: filePath,
-			header: detectionCSVLoggerHeader,
-		});
-		await csvWriter.writeRecords([]);
+		await logDetectionResult(entry, 'specification', errorResult);
 	}
 }
 
 // Main Function to Start Detection
-export async function startDetection(logFilePath: string): Promise<void> {
+export async function startSpecificationDetection(logFilePath: string) {
 	try {
-		await initializeCSV(filePath('/public/specification_detection_logs.csv'));
+		await initializeCSV(filePath('/public/specification_detection_logs.csv'), 'detection');
 		const filePosition = new FilePosition();
 
 		// First, read the entire file initially to catch up
@@ -824,7 +657,6 @@ export async function startDetection(logFilePath: string): Promise<void> {
 				console.log(`Processing batch ${i / batchSize + 1}/${Math.ceil(initialEntries.length / batchSize)}`);
 
 				for (const entry of batch) {
-					console.log('entry', entry);
 					await detectIntrusions(entry);
 				}
 			}
@@ -832,34 +664,9 @@ export async function startDetection(logFilePath: string): Promise<void> {
 			console.log('No existing entries found in the log file.');
 		}
 
-		console.log('Starting continuous monitoring...');
-
-		const runDetectionCycle = async () => {
-			try {
-				const newEntries = await readNewCSVLogEntries(logFilePath, filePosition);
-
-				if (newEntries.length > 0) {
-					console.log(`Processing ${newEntries.length} new entries from CSV...`);
-
-					for (const entry of newEntries) {
-						await detectIntrusions(entry);
-					}
-				}
-			} catch (error) {
-				console.error('Error in detection cycle:', error);
-			}
-		};
-
-		// Set up interval for continuous monitoring
-		setInterval(runDetectionCycle, 5000);
-		console.log('Detection system is now running. Checking for new entries every 5 seconds...');
+		return 'done';
 	} catch (error) {
 		console.error('Error starting detection:', error);
-		throw error;
+		return 'error';
 	}
 }
-
-// Start the detection system with the CSV file
-// startDetection(filePath('/public/ca_formatted_logs.csv')).catch(console.error);
-
-export { SpecificationBasedDetection };

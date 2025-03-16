@@ -1,102 +1,17 @@
 // detectionSignature.ts - Optimized signature-based detection for Certification Authority APIs
-import { createObjectCsvWriter as createCsvWriter } from 'csv-writer';
+
 import {
 	filePath,
 	LogEntry,
 	DetectionResult,
-	LogRecord,
 	FilePosition,
-	readNewLogEntries,
-	ensureLogFile,
-	detectionCSVLoggerHeader,
+	initializeCSV,
+	readNewCSVLogEntries,
+	logDetectionResult,
 } from './utils';
-
-// Regular expression patterns for detecting known attack signatures
-const securityPatterns = {
-	sqlInjection: [
-		/('|"|`)\s*(OR|AND)\s*[0-9]+\s*=\s*[0-9]+/i,
-		/('|"|`)\s*(OR|AND)\s*('|"|`)[^'"]*('|"|`)\s*=\s*('|"|`)/i,
-		/('|"|`)\s*(OR|AND)\s*[0-9]+\s*=\s*[0-9]+\s*(--|#|\/\*)/i,
-		/;\s*DROP\s+TABLE/i,
-		/UNION\s+(ALL\s+)?SELECT/i,
-		/SELECT\s+.*\s+FROM\s+information_schema/i,
-		/ALTER\s+TABLE/i,
-		/INSERT\s+INTO/i,
-		/DELETE\s+FROM/i,
-		/WAITFOR\s+DELAY/i,
-		/SLEEP\s*\(/i,
-		/BENCHMARK\s*\(/i,
-		/EXEC\s*(xp_|sp_)/i,
-	],
-	xss: [
-		/<script.*?>.*?<\/script>/i,
-		/javascript:/i,
-		/onerror\s*=/i,
-		/onload\s*=/i,
-		/onclick\s*=/i,
-		/onmouseover\s*=/i,
-		/onfocus\s*=/i,
-		/onblur\s*=/i,
-		/onkeydown\s*=/i,
-		/onkeypress\s*=/i,
-		/onkeyup\s*=/i,
-		/ondblclick\s*=/i,
-		/onchange\s*=/i,
-		/alert\s*\(/i,
-		/eval\s*\(/i,
-		/document\.cookie/i,
-		/document\.location/i,
-		/document\.write/i,
-		/document\.referrer/i,
-		/window\.location/i,
-		/window\.open/i,
-		/<img.*?src=.*?onerror=.*?>/i,
-	],
-	xxe: [/<!DOCTYPE.*?SYSTEM/i, /<!ENTITY.*?SYSTEM/i, /<!\[CDATA\[.*?\]\]>/i],
-	commandInjection: [/\s*\|\s*(\w+)/i, /`.*?`/, /\$\(.*?\)/, /;[\s\w\/]+/i, /&&[\s\w\/]+/i, /\|\|[\s\w\/]+/i],
-	directoryTraversal: [
-		/\.\.\//,
-		/\.\.\\/,
-		/%2e%2e\//i,
-		/%2e%2e\\/i,
-		/\.\.%2f/i,
-		/\.\.%5c/i,
-		/%252e%252e\//i,
-		/%252e%252e\\/i,
-	],
-	fileUpload: [
-		/\.php$/i,
-		/\.asp$/i,
-		/\.aspx$/i,
-		/\.exe$/i,
-		/\.jsp$/i,
-		/\.jspx$/i,
-		/\.sh$/i,
-		/\.bash$/i,
-		/\.csh$/i,
-		/\.bat$/i,
-		/\.cmd$/i,
-		/\.dll$/i,
-		/\.jar$/i,
-		/\.war$/i,
-	],
-	cookieInjection: [/document\.cookie.*?=/i],
-	maliciousHeaders: [/X-Forwarded-Host:\s*[^.]+\.[^.]+\.[^.]+/i, /Host:\s*[^.]+\.[^.]+\.[^.]+/i],
-	ssrf: [
-		/localhost/i,
-		/127\.0\.0\.1/i,
-		/0\.0\.0\.0/i,
-		/::1/i,
-		/192\.168\./i,
-		/10\./i,
-		/172\.(1[6-9]|2[0-9]|3[0-1])\./i,
-		/169\.254\./i,
-		/x00/i,
-	],
-};
-
+import { securityPatterns } from './security-patterns';
 // Signature-based Detection Implementation
-class SignatureBasedDetection {
+export class SignatureBasedDetection {
 	private static readonly KNOWN_ATTACK_PATTERNS = securityPatterns;
 
 	detect(entry: LogEntry): DetectionResult {
@@ -132,87 +47,64 @@ class SignatureBasedDetection {
 	}
 }
 
-// Logging Function
-async function logDetectionResult(entry: LogEntry, result: DetectionResult): Promise<void> {
-	try {
-		const csvPath = filePath('/public/signature_detection_logs.csv');
-
-		// Ensure the CSV file exists
-		await ensureLogFile(csvPath, 'timestamp,detectionType,detected,reason,request,response\n');
-
-		const csvWriter = createCsvWriter({
-			path: csvPath,
-			append: true,
-			header: detectionCSVLoggerHeader,
-		});
-
-		const record: LogRecord = {
-			timestamp: new Date().toISOString(),
-			detectionType: 'Signature',
-			detected: result.detected,
-			reason: result.reason,
-			request: JSON.stringify(entry.request),
-			response: JSON.stringify(entry.response),
-		};
-
-		await csvWriter.writeRecords([record]);
-
-		if (result.detected) {
-			console.log(`[${record.timestamp}] 🚨 Attack detected: ${result.reason}`);
-		} else {
-			console.log(`[${record.timestamp}] ✅ Clean request`);
-		}
-	} catch (error) {
-		console.error('Error logging detection result:', error);
-	}
-}
-
 // Main Detection Function
 async function detectIntrusions(entry: LogEntry): Promise<void> {
 	try {
 		const detector = new SignatureBasedDetection();
 		const result = detector.detect(entry);
-		await logDetectionResult(entry, result);
+		await logDetectionResult(entry, 'signature', result);
 	} catch (error) {
 		console.error('Error in intrusion detection:', error);
 	}
 }
 
-// Start Detection Process
-async function startDetection(logFilePath: string): Promise<void> {
-	console.log('Starting signature-based detection...');
-	console.log(`Monitoring log file: ${logFilePath}`);
+// Main Function to Start Detection
+export async function startSignatureDetection(logFilePath: string) {
+	try {
+		await initializeCSV(filePath('/public/signature_detection_logs.csv'), 'detection');
+		const filePosition = new FilePosition();
 
-	const filePosition = new FilePosition();
+		// First, read the entire file initially to catch up
+		console.log('Initial reading of the log file...');
+		const initialEntries = await readNewCSVLogEntries(logFilePath, filePosition);
 
-	// Create a detection cycle
-	const runDetectionCycle = async () => {
-		try {
-			const entries = await readNewLogEntries(logFilePath, filePosition);
+		if (initialEntries.length > 0) {
+			console.log(`Processing ${initialEntries.length} existing entries from CSV...`);
 
-			if (entries.length > 0) {
-				console.log(`Processing ${entries.length} new log entries`);
+			// Process a batch of entries at a time to avoid overwhelming the system
+			const batchSize = 10;
+			for (let i = 0; i < initialEntries.length; i += batchSize) {
+				const batch = initialEntries.slice(i, i + batchSize);
+				console.log(`Processing batch ${i / batchSize + 1}/${Math.ceil(initialEntries.length / batchSize)}`);
 
-				// Process each entry
-				for (const entry of entries) {
+				for (const entry of batch) {
 					await detectIntrusions(entry);
 				}
 			}
-		} catch (error) {
-			console.error('Error in detection cycle:', error);
+		} else {
+			console.log('No existing entries found in the log file.');
 		}
 
-		// Schedule next cycle after a short delay
-		setTimeout(runDetectionCycle, 5000);
-	};
+		return 'done';
 
-	// Start the cycle
-	runDetectionCycle();
+		// const runDetectionCycle = async () => {
+		// 	try {
+		// 		const newEntries = await readNewCSVLogEntries(logFilePath, filePosition);
+
+		// 		if (newEntries.length > 0) {
+		// 			console.log(`Processing ${newEntries.length} new entries from CSV...`);
+
+		// 			for (const entry of newEntries) {
+		// 				await detectIntrusions(entry);
+		// 			}
+		// 		}
+		// 	} catch (error) {
+		// 		console.error('Error in detection cycle:', error);
+		// 	}
+		// };
+		// runDetectionCycle();
+	} catch (error) {
+		console.error('Error starting detection:', error);
+		return 'error';
+	}
 }
-
-// Main execution - start detection on the requests_responses.txt file
-const logFile = filePath('/public/requests_responses.txt');
-startDetection(logFile);
-
-// Export for testing/external use
-export { SignatureBasedDetection };

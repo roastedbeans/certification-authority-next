@@ -5,14 +5,11 @@ import * as Tabs from '@radix-ui/react-tabs';
 import SecuritySummary from './SecuritySummary';
 import ApiLogsViewer from './ApiLogsViewer';
 import DetectionRuns from './DetectionRuns';
-import DetectionConfig from './DetectionConfig';
 
 const tabs = [
 	{ id: 'summary', label: 'Summary' },
 	{ id: 'detection', label: 'Detection Controls' },
 	{ id: 'logs', label: 'Logs Viewer' },
-	{ id: 'config', label: 'Configuration' },
-	{ id: 'check', label: 'Check' },
 ];
 
 export default function SecurityDashboardContent() {
@@ -54,12 +51,6 @@ export default function SecurityDashboardContent() {
 				value='logs'
 				className='outline-none'>
 				<ApiLogsViewer />
-			</Tabs.Content>
-
-			<Tabs.Content
-				value='config'
-				className='outline-none'>
-				<DetectionConfig />
 			</Tabs.Content>
 		</Tabs.Root>
 	);
