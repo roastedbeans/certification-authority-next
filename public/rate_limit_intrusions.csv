@@ -1,8 +1,0 @@
-timestamp,detectionType,detected,reason,clientId,endpoint,requestCount,timeframeStart,timeframeEnd
-
-2025-03-16T15:15:00.000Z,ratelimit,true,Endpoint rate limit exceeded: 33 requests in last minute to /api/v2/mgmts/oauth/2.0/token (limit: 10),anya123456,/api/v2/mgmts/oauth/2.0/token,33,2025-03-16T15:15:00.000Z,2025-03-16T15:20:00.000Z
-2025-03-16T15:15:00.000Z,ratelimit,true,Endpoint rate limit exceeded: 32 requests in last minute to /api/v2/mgmts/orgs (limit: 30),anya123456,/api/v2/mgmts/orgs,32,2025-03-16T15:15:00.000Z,2025-03-16T15:20:00.000Z
-2025-03-16T15:15:00.000Z,ratelimit,true,Endpoint rate limit exceeded: 32 requests in last minute to /api/oauth/2.0/token (limit: 10),anya123456,/api/oauth/2.0/token,32,2025-03-16T15:15:00.000Z,2025-03-16T15:20:00.000Z
-2025-03-16T15:15:00.000Z,ratelimit,true,Endpoint rate limit exceeded: 32 requests in last minute to /api/ca/sign_request (limit: 20),anya123456,/api/ca/sign_request,32,2025-03-16T15:15:00.000Z,2025-03-16T15:20:00.000Z
-2025-03-16T15:15:00.000Z,ratelimit,true,Endpoint rate limit exceeded: 32 requests in last minute to /api/ca/sign_result (limit: 20),anya123456,/api/ca/sign_result,32,2025-03-16T15:15:00.000Z,2025-03-16T15:20:00.000Z
-2025-03-16T15:15:00.000Z,ratelimit,true,Endpoint rate limit exceeded: 32 requests in last minute to /api/ca/sign_verification (limit: 30),anya123456,/api/ca/sign_verification,32,2025-03-16T15:15:00.000Z,2025-03-16T15:20:00.000Z
