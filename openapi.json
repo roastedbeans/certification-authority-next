@@ -1,0 +1,1529 @@
+{
+	"openapi": "3.0.3",
+	"info": {
+		"title": "마이데이터 표준 API 명세",
+		"description": "지원-001, 지원-002 API",
+		"version": "1.0.0"
+	},
+	"externalDocs": {
+		"description": "Find out more about Mydata API",
+		"url": "https://developers.mydatakorea.org/mdtb/apg/mac/bas/FSAG0301?id=8"
+	},
+	"servers": [
+		{
+			"url": "https://api.support.com",
+			"description": "지원 서버"
+		},
+		{
+			"url": "https://api.integratedauthentication.com",
+			"description": "통합인증 서버"
+		},
+		{
+			"url": "https://api.informationprovider.com",
+			"description": "정보제공 서버"
+		}
+	],
+	"paths": {
+		"/mgmts/oauth/2.0/token": {
+			"post": {
+				"summary": "지원-001: 지원 API 호출용 접근 토큰 발급 요청",
+				"tags": ["지원 API"],
+				"parameters": [
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자 (25자 이내)"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/x-www-form-urlencoded": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"grant_type": {
+										"type": "string",
+										"maxLength": 18,
+										"pattern": "^[a-z0-9_]{1,18}$",
+										"enum": ["client_credentials"],
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(18자 이내), 'client_credentials' 고정"
+									},
+									"client_id": {
+										"type": "string",
+										"maxLength": 50,
+										"pattern": "^[a-z0-9]{1,50}$",
+										"description": "알파벳 소문자, 정수형 숫자(50자 이내)"
+									},
+									"client_secret": {
+										"type": "string",
+										"maxLength": 50,
+										"pattern": "^[a-z0-9]{1,50}$",
+										"description": "알파벳 소문자, 정수형 숫자(50자 이내)"
+									},
+									"scope": {
+										"type": "string",
+										"maxLength": 6,
+										"pattern": "^[a-z]{1,6}$",
+										"enum": ["manage"],
+										"description": "알파벳 소문자(6자 이내), 'manage' 고정"
+									}
+								},
+								"required": ["grant_type", "client_id", "client_secret", "scope"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"maxLength": 5,
+											"pattern": "^[a-z0-9]{1,5}$",
+											"description": "알파벳 소문자, 정수형 숫자(5자 이내)"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"maxLength": 450,
+											"description": "한글 UTF-8 인코딩 문자열(450 Byte, 150글자)"
+										},
+										"token_type": {
+											"type": "string",
+											"maxLength": 6,
+											"pattern": "^[a-z]{1,6}$",
+											"enum": ["Bearer"],
+											"description": "알파벳 소문자(6자 이내), 'Bearer' 고정"
+										},
+										"access_token": {
+											"type": "string",
+											"maxLength": 1500,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내)"
+										},
+										"expires_in": {
+											"type": "integer",
+											"maximum": 999999999,
+											"description": "정수형 숫자(9자 이내)"
+										},
+										"scope": {
+											"type": "string",
+											"maxLength": 6,
+											"pattern": "^[a-z]{1,6}$",
+											"enum": ["manage"],
+											"description": "알파벳 소문자(6자 이내), 'manage' 고정"
+										}
+									},
+									"required": ["rsp_code", "token_type", "access_token", "expires_in", "scope"]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/v2/mgmts/orgs": {
+			"get": {
+				"summary": "지원-002: 기관 정보 조회",
+				"tags": ["지원 API"],
+				"parameters": [
+					{
+						"name": "Authorization",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 1500,
+							"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$"
+						},
+						"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내), 'Bearer' 접두어 포함"
+					},
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자(25자 이내)"
+					},
+					{
+						"name": "search_timestamp",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "string",
+							"maxLength": 14,
+							"pattern": "^[0-9]{1,14}$"
+						},
+						"description": "정수형 숫자(14자 이내)"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"maxLength": 30,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,30}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(30자 이내)"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"maxLength": 450,
+											"description": "한글 UTF-8 인코딩 문자열(450 Byte, 150글자)"
+										},
+										"search_timestamp": {
+											"type": "string",
+											"maxLength": 14,
+											"pattern": "^[0-9]{1,14}$",
+											"description": "정수형 숫자(14자 이내)"
+										},
+										"org_cnt": {
+											"type": "integer",
+											"maximum": 99999,
+											"description": "정수형 숫자(5자 이내)"
+										},
+										"org_list": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"op_type": {
+														"type": "string",
+														"maxLength": 1,
+														"pattern": "^[A-Z]{1}$",
+														"enum": ["I", "M", "D"],
+														"description": "알파벳 대문자(1자), 'I', 'M', 'D' 중 하나"
+													},
+													"org_code": {
+														"type": "string",
+														"maxLength": 10,
+														"pattern": "^[a-z0-9]{1,10}$",
+														"description": "알파벳 소문자, 정수형 숫자(10자 이내)"
+													},
+													"org_type": {
+														"type": "string",
+														"maxLength": 2,
+														"pattern": "^[0-9]{1,2}$",
+														"enum": ["01", "02", "03", "04", "05", "06", "07", "99"],
+														"description": "정수형 숫자(2자 이내), '01'~'07', '99' 중 하나"
+													},
+													"is_rcv_org": {
+														"type": "boolean",
+														"description": "기관 수신 여부"
+													},
+													"org_name": {
+														"type": "string",
+														"maxLength": 60,
+														"description": "한글 UTF-8 인코딩 문자열(60 Byte, 20글자)"
+													},
+													"org_regno": {
+														"type": "string",
+														"maxLength": 12,
+														"pattern": "^[0-9\\-]{1,12}$",
+														"description": "숫자, 특수기호(12자 이내), -포함"
+													},
+													"corp_regno": {
+														"type": "string",
+														"maxLength": 13,
+														"pattern": "^[a-z0-9]{1,13}$",
+														"description": "알파벳 소문자, 정수형 숫자(13자 이내)"
+													},
+													"serial_num": {
+														"type": "string",
+														"maxLength": 20,
+														"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,20}$",
+														"description": "알파벳 소문자, 정수형 숫자, 특수기호(20자 이내)"
+													},
+													"address": {
+														"type": "string",
+														"maxLength": 150,
+														"description": "한글 UTF-8 인코딩 문자열(150 Byte, 50글자)"
+													},
+													"domain": {
+														"type": "string",
+														"maxLength": 70,
+														"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,70}$",
+														"description": "알파벳 소문자, 정수형 숫자, 특수기호(70자 이내)"
+													},
+													"domain_ip_cnt": {
+														"type": "integer",
+														"maximum": 999,
+														"description": "정수형 숫자(3자 이내)"
+													},
+													"domain_ip_list": {
+														"type": "array",
+														"items": {
+															"type": "object",
+															"properties": {
+																"domain_ip": {
+																	"type": "string",
+																	"maxLength": 21,
+																	"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,21}$",
+																	"description": "알파벳 소문자, 정수형 숫자, 특수기호(21자 이내)"
+																}
+															},
+															"required": ["domain_ip"]
+														}
+													},
+													"relay_org_code": {
+														"type": "string",
+														"maxLength": 10,
+														"pattern": "^[a-z0-9]{1,10}$",
+														"description": "알파벳 소문자, 정수형 숫자(10자 이내)"
+													},
+													"industry": {
+														"type": "string",
+														"maxLength": 10,
+														"pattern": "^[a-z]{1,10}$",
+														"enum": [
+															"bank",
+															"card",
+															"invest",
+															"insu",
+															"efin",
+															"capital",
+															"ginsu",
+															"telecom",
+															"p2p",
+															"bond",
+															"usury",
+															"public"
+														],
+														"description": "알파벳 소문자(10자 이내), 'bank', 'card', 'invest', 'insu', 'efin', 'capital', 'ginsu', 'telecom', 'p2p', 'bond', 'usury', 'public' 중 하나"
+													},
+													"auth_type": {
+														"type": "string",
+														"maxLength": 2,
+														"pattern": "^[a-z0-9]{1,2}$",
+														"description": "알파벳 소문자, 정수형 숫자(2자 이내)"
+													},
+													"cert_issuer_dn": {
+														"type": "string",
+														"maxLength": 15,
+														"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,15}$",
+														"description": "알파벳 소문자, 정수형 숫자, 특수기호(15자 이내)"
+													},
+													"cert_oid": {
+														"type": "string",
+														"maxLength": 300,
+														"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,300}$",
+														"description": "알파벳 소문자, 정수형 숫자, 특수기호(300자 이내)"
+													},
+													"ip_cnt": {
+														"type": "integer",
+														"maximum": 999,
+														"description": "정수형 숫자(3자 이내)"
+													},
+													"ip_list": {
+														"type": "array",
+														"items": {
+															"type": "object",
+															"properties": {
+																"ip": {
+																	"type": "string",
+																	"maxLength": 15,
+																	"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,15}$",
+																	"description": "알파벳 소문자, 정수형 숫자, 특수기호(15자 이내)"
+																}
+															},
+															"required": ["ip"]
+														}
+													},
+													"np_time_cnt": {
+														"type": "integer",
+														"maximum": 999,
+														"description": "정수형 숫자(3자 이내)"
+													},
+													"np_time_list": {
+														"type": "array",
+														"items": {
+															"type": "object",
+															"properties": {
+																"np_time": {
+																	"type": "string",
+																	"maxLength": 9,
+																	"pattern": "^[0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,9}$",
+																	"description": "정수형 숫자, 특수기호(9자 이내)"
+																}
+															},
+															"required": ["np_time"]
+														}
+													}
+												},
+												"required": ["op_type", "org_code", "org_type"]
+											}
+										}
+									},
+									"required": ["rsp_code", "org_cnt", "org_list"]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/oauth/2.0/iatoken": {
+			"post": {
+				"summary": "통합인증-101: 접근토큰 발급 요청(통합인증기관)",
+				"tags": ["통합인증 API"],
+				"parameters": [
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리, 'M':마이데이터 사업자, 'S':정보제공자, 'R':중계기관, 'C':정보수신자, 'P':종합포털, 'A':통합인증기관)+부여번호(14자리)"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/x-www-form-urlencoded; charset=UTF-8": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"grant_type": {
+										"type": "string",
+										"maxLength": 18,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,18}$",
+										"enum": ["client_credentials"],
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(18자 이내), 'client_credentials' 고정"
+									},
+									"client_id": {
+										"type": "string",
+										"maxLength": 50,
+										"pattern": "^[a-z0-9]{1,50}$",
+										"description": "알파벳 소문자, 정수형 숫자(50자 이내)"
+									},
+									"client_secret": {
+										"type": "string",
+										"maxLength": 50,
+										"pattern": "^[a-z0-9]{1,50}$",
+										"description": "알파벳 소문자, 정수형 숫자(50자 이내)"
+									},
+									"scope": {
+										"type": "string",
+										"maxLength": 6,
+										"pattern": "^[a-z]{1,6}$",
+										"enum": ["ca"],
+										"description": "알파벳 소문자(6자 이내), 'ca' 고정"
+									}
+								},
+								"required": ["grant_type", "client_id", "client_secret", "scope"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"token_type": {
+											"type": "string",
+											"maxLength": 6,
+											"pattern": "^[a-z]{1,6}$",
+											"enum": ["Bearer"],
+											"description": "알파벳 소문자(6자 이내), 'Bearer' 고정"
+										},
+										"access_token": {
+											"type": "string",
+											"maxLength": 1500,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내)"
+										},
+										"expires_in": {
+											"type": "integer",
+											"maximum": 999999999,
+											"description": "정수형 숫자(9자 이내), 단위-초"
+										},
+										"scope": {
+											"type": "string",
+											"maxLength": 6,
+											"pattern": "^[a-z]{1,6}$",
+											"enum": ["ca"],
+											"description": "알파벳 소문자(6자 이내), 'ca' 고정"
+										}
+									},
+									"required": ["token_type", "access_token", "expires_in", "scope"]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/ca/sign_request": {
+			"post": {
+				"summary": "통합인증-102: 전자서명 요청",
+				"tags": ["통합인증 API"],
+				"parameters": [
+					{
+						"name": "Authorization",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 1500,
+							"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$"
+						},
+						"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내), 'Bearer' 접두어 포함"
+					},
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json; charset=UTF-8": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"sign_tx_id": {
+										"type": "string",
+										"maxLength": 49,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,49}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(49자 이내), 마이데이터사업자 기관코드(10), 인증기관 기관코드(10), 전자서명 요청시간(YYYYMMDDHHMMSS, 14), 일련번호(12)"
+									},
+									"user_ci": {
+										"type": "string",
+										"maxLength": 100,
+										"description": "Base64 인코딩 포맷(100자 이내)"
+									},
+									"real_name": {
+										"type": "string",
+										"maxLength": 30,
+										"description": "한글 UTF-8 인코딩 문자열(30 Byte, 10글자)"
+									},
+									"phone_num": {
+										"type": "string",
+										"maxLength": 15,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,15}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(15자 이내), '+82' 형식"
+									},
+									"request_title": {
+										"type": "string",
+										"maxLength": 120,
+										"description": "한글 UTF-8 인코딩 문자열(120 Byte, 40글자)"
+									},
+									"device_code": {
+										"type": "string",
+										"maxLength": 2,
+										"pattern": "^[A-Z0-9]{1,2}$",
+										"enum": ["PC", "TB", "MO"],
+										"description": "알파벳 대문자, 정수형 숫자(2자 이내), PC - PC, TB - Tablet, MO - Mobile"
+									},
+									"device_browser": {
+										"type": "string",
+										"maxLength": 2,
+										"pattern": "^[A-Z0-9]{1,2}$",
+										"enum": ["WB", "NA", "HY"],
+										"description": "알파벳 대문자, 정수형 숫자(2자 이내), WB - 웹브라우저, NA - Native App, HY - Hybrid App"
+									},
+									"return_app_scheme_url": {
+										"type": "string",
+										"maxLength": 1000,
+										"description": "한글 UTF-8 인코딩 문자열(1000 Byte), device_code: 'MO', device_browser: 'NA' 또는 'HY'인 경우에만 세팅"
+									},
+									"consent_type": {
+										"type": "string",
+										"maxLength": 1,
+										"pattern": "^[a-z0-9]{1}$",
+										"enum": ["0", "1"],
+										"description": "알파벳 소문자, 정수형 숫자(1자), 0 또는 1"
+									},
+									"consent_cnt": {
+										"type": "integer",
+										"maximum": 9999,
+										"description": "정수형 숫자(4자 이내)"
+									},
+									"consent_list": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"consent_len": {
+													"type": "integer",
+													"maximum": 99999,
+													"description": "정수형 숫자(5자 이내), consent_type이 0 - 전송요구내역 원문의 길이, consent_type이 1 - 전송요구내역 원문의 해시값(SHA-256)의 길이"
+												},
+												"consent_title": {
+													"type": "string",
+													"maxLength": 120,
+													"description": "한글 UTF-8 인코딩 문자열(120 Byte)"
+												},
+												"consent": {
+													"type": "string",
+													"maxLength": 7000,
+													"description": "한글 UTF-8 인코딩 문자열(7000 Byte), consent_type이 0 - 전송요구내역 원문, consent_type이 1 - 전송요구내역 원문의 해시값(SHA-256)"
+												}
+											},
+											"required": ["consent_len", "consent_title", "consent"]
+										}
+									},
+									"tx_id": {
+										"type": "string",
+										"maxLength": 74,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,74}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(74자 이내), 식별자(MD)_마이데이터사업자 기관코드(10)_정보제공자 기관코드(10)_중계기관 기관코드(10)_인증기관 기관코드(10)_통합인증 요청 시간(YYYYMMDDHHMMSS, 14)_일련번호(숫자, 12)"
+									}
+								},
+								"required": ["sign_tx_id", "user_ci", "consent_type", "consent_cnt", "consent_list"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"maxLength": 30,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,30}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(30자 이내)"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"maxLength": 450,
+											"description": "한글 UTF-8 인코딩 문자열(450 Byte)"
+										},
+										"sign_ios_app_scheme_url": {
+											"type": "string",
+											"maxLength": 1000,
+											"description": "한글 UTF-8 인코딩 문자열(1000 Byte)"
+										},
+										"sign_aos_app_scheme_url": {
+											"type": "string",
+											"maxLength": 1000,
+											"description": "한글 UTF-8 인코딩 문자열(1000 Byte)"
+										},
+										"sign_web_url": {
+											"type": "string",
+											"maxLength": 1000,
+											"description": "한글 UTF-8 인코딩 문자열(1000 Byte)"
+										},
+										"cert_tx_id": {
+											"type": "string",
+											"maxLength": 40,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,40}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(40자 이내)"
+										}
+									},
+									"required": ["rsp_code"]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/ca/sign_result": {
+			"post": {
+				"summary": "통합인증-103: 전자서명 결과 조회",
+				"tags": ["통합인증 API"],
+				"parameters": [
+					{
+						"name": "Authorization",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 1500,
+							"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$"
+						},
+						"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내), 'Bearer' 접두어 포함"
+					},
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json; charset=UTF-8": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"cert_tx_id": {
+										"type": "string",
+										"maxLength": 40,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,40}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(40자 이내)"
+									},
+									"sign_tx_id": {
+										"type": "string",
+										"maxLength": 49,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,49}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(49자 이내), 마이데이터사업자 기관코드(10), 인증기관 기관코드(10), 전자서명 요청시간(YYYYMMDDHHMMSS, 14), 일련번호(12)"
+									}
+								},
+								"required": ["cert_tx_id", "sign_tx_id"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"maxLength": 30,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,30}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(30자 이내)"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"maxLength": 450,
+											"description": "한글 UTF-8 인코딩 문자열(450 Byte)"
+										},
+										"signed_consent_cnt": {
+											"type": "integer",
+											"maximum": 9999,
+											"description": "정수형 숫자(4자 이내)"
+										},
+										"signed_consent_list": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"signed_consent_len": {
+														"type": "integer",
+														"maximum": 99999,
+														"description": "정수형 숫자(5자 이내)"
+													},
+													"signed_consent": {
+														"type": "string",
+														"maxLength": 10000,
+														"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,10000}$",
+														"description": "알파벳 소문자, 정수형 숫자, 특수기호(10000자 이내), CMS SignedData, Base64url-safe 인코딩"
+													}
+												},
+												"required": ["signed_consent_len", "signed_consent"]
+											}
+										},
+										"tx_id": {
+											"type": "string",
+											"maxLength": 74,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,74}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(74자 이내), 식별자(MD)_마이데이터사업자 기관코드(10)_정보제공자 기관코드(10)_중계기관 기관코드(10)_인증기관 기관코드(10)_통합인증 요청 시간(YYYYMMDDHHMMSS, 14)_일련번호(숫자, 12)"
+										}
+									},
+									"required": ["rsp_code", "signed_consent_cnt", "signed_consent_list", "tx_id"]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/oauth/2.0/iptoken": {
+			"post": {
+				"summary": "통합인증-002: 접근토큰 발급 요청(정보제공자)",
+				"tags": ["통합인증 API"],
+				"parameters": [
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/x-www-form-urlencoded; charset=UTF-8": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"tx_id": {
+										"type": "string",
+										"maxLength": 74,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,74}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(74자 이내), 식별자(MD)_마이데이터사업자 기관코드(10)_정보제공자 기관코드(10)_중계기관 기관코드(10)_인증기관 기관코드(10)_통합인증 요청 시간(YYYYMMDDHHMMSS, 14)_일련번호(숫자, 12)"
+									},
+									"org_code": {
+										"type": "string",
+										"maxLength": 10,
+										"pattern": "^[a-z0-9]{1,10}$",
+										"description": "알파벳 소문자, 정수형 숫자(10자 이내)"
+									},
+									"grant_type": {
+										"type": "string",
+										"maxLength": 8,
+										"pattern": "^[a-z0-9]{1,8}$",
+										"enum": ["password"],
+										"description": "알파벳 소문자, 정수형 숫자(8자 이내), 'password' 고정"
+									},
+									"client_id": {
+										"type": "string",
+										"maxLength": 50,
+										"pattern": "^[a-z0-9]{1,50}$",
+										"description": "알파벳 소문자, 정수형 숫자(50자 이내)"
+									},
+									"client_secret": {
+										"type": "string",
+										"maxLength": 50,
+										"pattern": "^[a-z0-9]{1,50}$",
+										"description": "알파벳 소문자, 정수형 숫자(50자 이내)"
+									},
+									"ca_code": {
+										"type": "string",
+										"maxLength": 10,
+										"pattern": "^[a-z0-9]{1,10}$",
+										"description": "알파벳 소문자, 정수형 숫자(10자 이내)"
+									},
+									"username": {
+										"type": "string",
+										"maxLength": 100,
+										"description": "Base64 인코딩 포맷(100자 이내)"
+									},
+									"request_type": {
+										"type": "string",
+										"maxLength": 1,
+										"pattern": "^[a-z0-9]{1}$",
+										"enum": ["1"],
+										"description": "알파벳 소문자, 정수형 숫자(1자), '1' 고정"
+									},
+									"password_len": {
+										"type": "integer",
+										"maximum": 99999,
+										"description": "정수형 숫자(5자 이내)"
+									},
+									"password": {
+										"type": "string",
+										"maxLength": 10000,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,10000}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(10000자 이내), CMS SignedData, Base64 url-safe 인코딩"
+									},
+									"auth_type": {
+										"type": "string",
+										"maxLength": 1,
+										"pattern": "^[a-z0-9]{1}$",
+										"enum": ["0", "1"],
+										"description": "알파벳 소문자, 정수형 숫자(1자), 0 또는 1"
+									},
+									"consent_type": {
+										"type": "string",
+										"maxLength": 1,
+										"pattern": "^[a-z0-9]{1}$",
+										"enum": ["0", "1"],
+										"description": "알파벳 소문자, 정수형 숫자(1자), 0 또는 1"
+									},
+									"consent_len": {
+										"type": "integer",
+										"maximum": 99999,
+										"description": "정수형 숫자(5자 이내)"
+									},
+									"consent": {
+										"type": "string",
+										"maxLength": 7000,
+										"description": "한글 UTF-8 인코딩 문자열(7000 Byte)"
+									},
+									"signed_person_info_req_len": {
+										"type": "integer",
+										"maximum": 99999,
+										"description": "정수형 숫자(5자 이내)"
+									},
+									"signed_person_info_req": {
+										"type": "string",
+										"maxLength": 10000,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,10000}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(10000자 이내), CMS SignedData, Base64 url-safe 인코딩"
+									},
+									"consent_nonce": {
+										"type": "string",
+										"maxLength": 30,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,30}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(30자 이내), Base64 url-safe 인코딩"
+									},
+									"ucpid_nonce": {
+										"type": "string",
+										"maxLength": 30,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,30}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(30자 이내), Base64 url-safe 인코딩"
+									},
+									"cert_tx_id": {
+										"type": "string",
+										"maxLength": 40,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,40}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(40자 이내)"
+									},
+									"service_id": {
+										"type": "string",
+										"maxLength": 22,
+										"pattern": "^[A-Z0-9]{1,22}$",
+										"description": "알파벳 대문자, 정수형 숫자(22자 이내), 기관코드(10자리) + 등록일자(8자리) + 순번(4자리)"
+									}
+								},
+								"required": [
+									"tx_id",
+									"org_code",
+									"grant_type",
+									"client_id",
+									"client_secret",
+									"ca_code",
+									"username",
+									"request_type",
+									"password_len",
+									"password",
+									"auth_type",
+									"consent_type"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"tx_id": {
+											"type": "string",
+											"maxLength": 74,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,74}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(74자 이내), 식별자(MD)_마이데이터사업자 기관코드(10)_정보제공자 기관코드(10)_중계기관 기관코드(10)_인증기관 기관코드(10)_통합인증 요청 시간(YYYYMMDDHHMMSS, 14)_일련번호(숫자, 12)"
+										},
+										"token_type": {
+											"type": "string",
+											"maxLength": 6,
+											"pattern": "^[a-z]{1,6}$",
+											"enum": ["Bearer"],
+											"description": "알파벳 소문자(6자 이내), 'Bearer' 고정"
+										},
+										"access_token": {
+											"type": "string",
+											"maxLength": 1500,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내)"
+										},
+										"expires_in": {
+											"type": "integer",
+											"maximum": 999999999,
+											"description": "정수형 숫자(9자 이내), 단위-초"
+										},
+										"refresh_token": {
+											"type": "string",
+											"maxLength": 1500,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내)"
+										},
+										"refresh_token_expires_in": {
+											"type": "integer",
+											"maximum": 999999999,
+											"description": "정수형 숫자(9자 이내), 단위-초"
+										},
+										"scope": {
+											"type": "string",
+											"maxLength": 128,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,128}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(128자 이내)"
+										}
+									},
+									"required": [
+										"tx_id",
+										"token_type",
+										"access_token",
+										"expires_in",
+										"refresh_token",
+										"refresh_token_expires_in",
+										"scope"
+									]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/ca/sign_verification": {
+			"post": {
+				"summary": "통합인증-104: 전자서명 위임 검증",
+				"tags": ["통합인증 API"],
+				"parameters": [
+					{
+						"name": "Authorization",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 1500,
+							"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$"
+						},
+						"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내), 'Bearer' 접두어 포함"
+					},
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json; charset=UTF-8": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"cert_tx_id": {
+										"type": "string",
+										"maxLength": 40,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,40}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(40자 이내)"
+									},
+									"tx_id": {
+										"type": "string",
+										"maxLength": 74,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,74}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(74자 이내), 식별자(MD)_마이데이터사업자 기관코드(10)_정보제공자 기관코드(10)_중계기관 기관코드(10)_인증기관 기관코드(10)_통합인증 요청 시간(YYYYMMDDHHMMSS, 14)_일련번호(숫자, 12)"
+									},
+									"signed_consent_len": {
+										"type": "integer",
+										"maximum": 99999,
+										"description": "정수형 숫자(5자 이내)"
+									},
+									"signed_consent": {
+										"type": "string",
+										"maxLength": 10000,
+										"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,10000}$",
+										"description": "알파벳 소문자, 정수형 숫자, 특수기호(10000자 이내), CMS SignedData, Base64url-safe 인코딩"
+									},
+									"consent_type": {
+										"type": "string",
+										"maxLength": 1,
+										"pattern": "^[a-z0-9]{1}$",
+										"enum": ["0", "1"],
+										"description": "알파벳 소문자, 정수형 숫자(1자), 0 또는 1"
+									},
+									"consent_len": {
+										"type": "integer",
+										"maximum": 99999,
+										"description": "정수형 숫자(5자 이내)"
+									},
+									"consent": {
+										"type": "string",
+										"maxLength": 7000,
+										"description": "한글 UTF-8 인코딩 문자열(7000 Byte)"
+									}
+								},
+								"required": ["cert_tx_id", "tx_id", "signed_consent_len", "signed_consent", "consent_type"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"tx_id": {
+											"type": "string",
+											"maxLength": 74,
+											"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,74}$",
+											"description": "알파벳 소문자, 정수형 숫자, 특수기호(74자 이내), 식별자(MD)_마이데이터사업자 기관코드(10)_정보제공자 기관코드(10)_중계기관 기관코드(10)_인증기관 기관코드(10)_통합인증 요청 시간(YYYYMMDDHHMMSS, 14)_일련번호(숫자, 12)"
+										},
+										"rsp_code": {
+											"type": "string",
+											"maxLength": 5,
+											"pattern": "^[a-z0-9]{1,5}$",
+											"description": "알파벳 소문자, 정수형 숫자(5자 이내)"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"maxLength": 450,
+											"description": "한글 UTF-8 인코딩 문자열(450 Byte)"
+										},
+										"result": {
+											"type": "boolean",
+											"description": "검증 결과, true 또는 false"
+										},
+										"user_ci": {
+											"type": "string",
+											"description": "Base64 인코딩 포맷"
+										}
+									},
+									"required": ["tx_id", "rsp_code", "result"]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/accounts/deposit/basic": {
+			"post": {
+				"summary": "은행-002: 수신 계좌 기본 정보 조회",
+				"tags": ["정보제공 API"],
+				"parameters": [
+					{
+						"name": "Authorization",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 1500,
+							"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$"
+						},
+						"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내), 'Bearer' 접두어 포함"
+					},
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+					},
+					{
+						"name": "x-api-type",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 12,
+							"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,12}$"
+						},
+						"description": "알파벳 소문자, 정수형 숫자, 특수기호(12자 이내)"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json; charset=UTF-8": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"org_code": {
+										"type": "string",
+										"maxLength": 10,
+										"pattern": "^[a-z0-9]{1,10}$",
+										"description": "알파벳 소문자, 정수형 숫자(10자 이내)"
+									},
+									"account_num": {
+										"type": "string",
+										"maxLength": 20,
+										"pattern": "^[a-z0-9]{1,20}$",
+										"description": "알파벳 소문자, 정수형 숫자(20자 이내)"
+									},
+									"seqno": {
+										"type": "string",
+										"maxLength": 7,
+										"pattern": "^[a-z0-9]{1,7}$",
+										"description": "알파벳 소문자, 정수형 숫자(7자 이내)"
+									},
+									"search_timestamp": {
+										"type": "string",
+										"maxLength": 14,
+										"pattern": "^[0-9]{1,14}$",
+										"description": "정수형 숫자(14자 이내)"
+									}
+								},
+								"required": ["org_code", "account_num"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"maxLength": 5,
+											"pattern": "^[a-z0-9]{1,5}$",
+											"description": "알파벳 소문자, 정수형 숫자(5자 이내)"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"maxLength": 450,
+											"description": "한글 UTF-8 인코딩 문자열(450 Byte)"
+										},
+										"search_timestamp": {
+											"type": "string",
+											"maxLength": 14,
+											"pattern": "^[0-9]{1,14}$",
+											"description": "정수형 숫자(14자 이내)"
+										},
+										"basic_cnt": {
+											"type": "integer",
+											"maximum": 999,
+											"description": "정수형 숫자(3자 이내)"
+										},
+										"baic_list": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"currency_code": {
+														"type": "string",
+														"maxLength": 3,
+														"pattern": "^[A-Z]{1,3}$",
+														"enum": ["KRW", "USD", "EUR", "CNY", "JPY"],
+														"description": "알파벳 대문자(3자 이내), KRW, USD, EUR, CNY, JPY 중 하나"
+													},
+													"saving_method": {
+														"type": "string",
+														"maxLength": 2,
+														"pattern": "^[a-z0-9]{1,2}$",
+														"enum": ["01", "02", "03", "04"],
+														"description": "알파벳 소문자, 정수형 숫자(2자 이내), 01, 02, 03, 04 중 하나"
+													},
+													"issue_date": {
+														"type": "string",
+														"format": "date",
+														"description": "발급일"
+													},
+													"exp_date": {
+														"type": "string",
+														"format": "date",
+														"description": "만기일"
+													},
+													"commit_amt": {
+														"type": "number",
+														"format": "float",
+														"maximum": 1000000000000000,
+														"description": "실수형 숫자(전체 자릿수 18, 소수점 이하 자릿수 3)"
+													},
+													"monthly_paid_in_amt": {
+														"type": "number",
+														"format": "float",
+														"maximum": 1000000000000000,
+														"description": "실수형 숫자(전체 자릿수 18, 소수점 이하 자릿수 3)"
+													}
+												},
+												"required": ["currency_code", "saving_method", "issue_date"]
+											}
+										}
+									},
+									"required": ["rsp_code", "basic_cnt", "baic_list"]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/accounts/deposit/detail": {
+			"post": {
+				"summary": "은행-003: 수신 계좌 추가 정보 조회",
+				"tags": ["정보제공 API"],
+				"parameters": [
+					{
+						"name": "Authorization",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 1500,
+							"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,1500}$"
+						},
+						"description": "알파벳 소문자, 정수형 숫자, 특수기호(1500자 이내), 'Bearer' 접두어 포함"
+					},
+					{
+						"name": "x-api-tran-id",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 25,
+							"pattern": "^[A-Z0-9]{1,25}$"
+						},
+						"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+					},
+					{
+						"name": "x-api-type",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"maxLength": 12,
+							"pattern": "^[a-z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{1,12}$"
+						},
+						"description": "알파벳 소문자, 정수형 숫자, 특수기호(12자 이내)"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json; charset=UTF-8": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"org_code": {
+										"type": "string",
+										"maxLength": 10,
+										"pattern": "^[a-z0-9]{1,10}$",
+										"description": "알파벳 소문자, 정수형 숫자(10자 이내)"
+									},
+									"account_num": {
+										"type": "string",
+										"maxLength": 20,
+										"pattern": "^[a-z0-9]{1,20}$",
+										"description": "알파벳 소문자, 정수형 숫자(20자 이내)"
+									},
+									"seqno": {
+										"type": "string",
+										"maxLength": 7,
+										"pattern": "^[a-z0-9]{1,7}$",
+										"description": "알파벳 소문자, 정수형 숫자(7자 이내)"
+									},
+									"search_timestamp": {
+										"type": "string",
+										"maxLength": 14,
+										"pattern": "^[0-9]{1,14}$",
+										"description": "정수형 숫자(14자 이내)"
+									}
+								},
+								"required": ["org_code", "account_num"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Successful Response",
+						"headers": {
+							"x-api-tran-id": {
+								"schema": {
+									"type": "string",
+									"maxLength": 25,
+									"pattern": "^[A-Z0-9]{1,25}$"
+								},
+								"description": "알파벳 대문자, 정수형 숫자(25자 이내), 기관코드(10자리)+생성주체구분코드(1자리)+부여번호(14자리)"
+							}
+						},
+						"content": {
+							"application/json; charset=UTF-8": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"rsp_code": {
+											"type": "string",
+											"maxLength": 5,
+											"pattern": "^[a-z0-9]{1,5}$",
+											"description": "알파벳 소문자, 정수형 숫자(5자 이내)"
+										},
+										"rsp_msg": {
+											"type": "string",
+											"maxLength": 450,
+											"description": "한글 UTF-8 인코딩 문자열(450 Byte)"
+										},
+										"search_timestamp": {
+											"type": "string",
+											"maxLength": 14,
+											"pattern": "^[0-9]{1,14}$",
+											"description": "정수형 숫자(14자 이내)"
+										},
+										"detail_cnt": {
+											"type": "integer",
+											"maximum": 999,
+											"description": "정수형 숫자(3자 이내)"
+										},
+										"detail_list": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"currency_code": {
+														"type": "string",
+														"maxLength": 3,
+														"pattern": "^[A-Z]{1,3}$",
+														"enum": ["KRW", "USD", "EUR", "CNY", "JPY"],
+														"description": "알파벳 대문자(3자 이내), KRW, USD, EUR, CNY, JPY 중 하나"
+													},
+													"Balance_amt": {
+														"type": "number",
+														"format": "float",
+														"maximum": 1000000000000000,
+														"description": "실수형 숫자(전체 자릿수 18, 소수점 이하 자릿수 3)"
+													},
+													"withdrawable_amt": {
+														"type": "number",
+														"format": "float",
+														"maximum": 1000000000000000,
+														"description": "실수형 숫자(전체 자릿수 18, 소수점 이하 자릿수 3)"
+													},
+													"offered_rate": {
+														"type": "number",
+														"format": "float",
+														"maximum": 99.99999,
+														"description": "실수형 숫자(전체 자릿수 7, 소수점 이하 자릿수 5)"
+													},
+													"last_paid_in_cnt": {
+														"type": "integer",
+														"maximum": 999999,
+														"description": "정수형 숫자(6자 이내)"
+													}
+												},
+												"required": ["currency_code"]
+											}
+										}
+									},
+									"required": ["rsp_code", "detail_cnt", "detail_list"]
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

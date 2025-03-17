@@ -1,8 +1,7 @@
-// app/api/ca/sign_result/route.ts
+// app/api/ca/sign_verification/route.ts
 
 import { getResponseContent, getResponseMessage } from '@/constants/responseMessages';
 import { NextRequest, NextResponse } from 'next/server';
-import { createSignedConsentList } from '@/utils/signatureGenerator';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@/utils/generateCSV';
 
@@ -24,7 +23,7 @@ export async function POST(req: NextRequest) {
 	const query = Object.fromEntries(req.nextUrl.searchParams);
 	const body = await req.json();
 
-	const { cert_tx_id, sign_tx_id } = body;
+	const { cert_tx_id, tx_id, signed_consent_len, signed_consent, consent_type, consent_len, consent } = body;
 
 	const request = {
 		method,
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
 			return NextResponse.json(response, { status: 400 });
 		}
 
-		if (!cert_tx_id || cert_tx_id.length !== 40) {
+		if (!cert_tx_id || cert_tx_id.length > 40) {
 			const response = getResponseContent({
 				headers: {
 					xApiTranId: xApiTranId || '',
@@ -72,75 +71,54 @@ export async function POST(req: NextRequest) {
 			return NextResponse.json(response, { status: 400 });
 		}
 
-		if (!sign_tx_id || sign_tx_id.length !== 49) {
+		if (!tx_id || tx_id.length > 74) {
 			const response = getResponseContent({
 				headers: {
-					xApiTranId: xApiTranId || '',
 					contentType: 'application/json;charset=UTF-8',
+					xApiTranId: xApiTranId || '',
 				},
-				body: getResponseMessage('INVALID_SIGN_TX_ID'),
+				body: getResponseMessage('INVALID_TX_ID'),
 			});
 			await logger(JSON.stringify(request), JSON.stringify(response), 400);
 			return NextResponse.json(response, { status: 400 });
 		}
 
-		// 3. Fetch consent list from the database
-		const certificate = await prisma.certificate.findFirst({
+		if (!signed_consent_len || !signed_consent || !consent_type || !consent_len || !consent) {
+			const response = getResponseContent({
+				headers: {
+					contentType: 'application/json;charset=UTF-8',
+					xApiTranId: xApiTranId || '',
+				},
+				body: getResponseMessage('INVALID_PARAMETERS'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 400);
+			return NextResponse.json(response, { status: 400 });
+		}
+
+		const account = await prisma.certificate.findFirst({
 			where: {
 				certTxId: cert_tx_id,
 			},
 			select: {
 				id: true,
-				signTxId: true,
-				consentList: true,
-				userId: true,
+				userCI: true,
 			},
 		});
 
-		const orgCode = sign_tx_id.split('_')[0];
-		const caCode = sign_tx_id.split('_')[1];
+		let result = false;
+		let user_ci = '';
 
-		const certificateAuthority = await prisma.certificateAuthority.findUnique({
-			where: {
-				caCode: caCode,
-			},
-		});
-
-		const consent = await prisma.consent.findMany({
-			where: {
-				certificateId: certificate?.id,
-			},
-		});
-
-		const signedConsentList = createSignedConsentList(
-			consent,
-			certificate?.userId || '',
-			certificate?.id || '',
-			certificateAuthority?.privateKey || ''
-		);
-
-		for (const signedConsent of signedConsentList) {
-			await prisma.signedConsent.create({
-				data: signedConsent,
-			});
+		if (account) {
+			result = true;
+			user_ci = account.userCI;
 		}
 
-		//format signed consent list
-		const signedConsentListFormatted = signedConsentList.map((signedConsent) => {
-			return {
-				signed_consent_len: signedConsent.signedConsentLen,
-				signed_consent: signedConsent.signedConsent,
-				tx_id: signedConsent.txId,
-				user_id: signedConsent.userId,
-				certificate_id: signedConsent.certificateId,
-			};
-		});
-
 		const responseData = {
+			tx_id: tx_id,
 			rsp_code: getResponseMessage('SUCCESS').code,
 			rsp_msg: getResponseMessage('SUCCESS').message,
-			signed_consent_cnt: signedConsentList.length,
-			signed_consent_list: signedConsentListFormatted,
+			result: result,
+			user_ci: user_ci,
 		};
 
 		const response = getResponseContent({
@@ -153,7 +131,7 @@ export async function POST(req: NextRequest) {
 
 		await logger(JSON.stringify(request), JSON.stringify(response), 200);
 
-		return NextResponse.json(response, { status: 200 });
+		return NextResponse.json(response);
 	} catch (error) {
 		const response = getResponseContent({
 			headers: {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { getResponseMessage } from '@/constants/responseMessages';
+import { getResponseContent, getResponseMessage } from '@/constants/responseMessages';
 import { timestamp } from '@/utils/formatTimestamp';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@/utils/generateCSV';
@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
 
 	const currentDate = new Date();
 
+	console.log('authorization', authorization);
+
 	searchParams.set('search_timestamp', timestamp(currentDate));
 	const searchTimestamp = searchParams.get('search_timestamp');
 
@@ -29,41 +31,77 @@ export async function GET(req: NextRequest) {
 		url,
 		query,
 		headers: headersList,
+		body: '',
 	};
 
 	try {
-		if (!timestamp || timestamp.length > 14) {
-			await logger(JSON.stringify(request), '', JSON.stringify(getResponseMessage('INVALID_PARAMETERS')), '401');
-			return NextResponse.json(getResponseMessage('INVALID_PARAMETERS'), { status: 400 });
+		if (!timestamp) {
+			const response = getResponseContent({
+				headers: {
+					contentType: 'application/json;charset=UTF-8',
+					xApiTranId: xApiTranId || '',
+				},
+				body: getResponseMessage('INVALID_PARAMETERS'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 400);
+			return NextResponse.json(response, { status: 400 });
 		}
 
 		if (!authorization || !authorization.startsWith('Bearer ')) {
-			await logger(JSON.stringify(request), '', JSON.stringify(getResponseMessage('UNAUTHORIZED')), '401');
-			return NextResponse.json(getResponseMessage('UNAUTHORIZED'), { status: 401 });
+			const response = getResponseContent({
+				headers: {
+					contentType: 'application/json;charset=UTF-8',
+					xApiTranId: xApiTranId || '',
+				},
+				body: getResponseMessage('UNAUTHORIZED'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 401);
+			return NextResponse.json(response, { status: 401 });
 		}
 
 		// Extract the token
 		const token = authorization.split(' ')[1];
-		let decodedToken;
+		let _decodedToken;
 
 		try {
-			decodedToken = jwt.verify(token, JWT_SECRET);
+			_decodedToken = jwt.verify(token, JWT_SECRET);
 		} catch (error) {
-			await logger(JSON.stringify(request), '', JSON.stringify(getResponseMessage('INVALID_TOKEN')), '403');
-			return NextResponse.json(getResponseMessage('INVALID_TOKEN'), { status: 403 });
+			const response = getResponseContent({
+				headers: {
+					contentType: 'application/json;charset=UTF-8',
+					xApiTranId: xApiTranId || '',
+				},
+				body: getResponseMessage('INVALID_TOKEN'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 403);
+			return NextResponse.json(response, { status: 403 });
 		}
 
 		// Validate x-api-tran-id
-		if (!xApiTranId || xApiTranId.length > 25) {
-			await logger(JSON.stringify(request), '', JSON.stringify(getResponseMessage('INVALID_API_TRAN_ID')), '400');
-			return NextResponse.json(getResponseMessage('INVALID_API_TRAN_ID'), { status: 400 });
+		if (!xApiTranId) {
+			const response = getResponseContent({
+				headers: {
+					contentType: 'application/json;charset=UTF-8',
+					xApiTranId: xApiTranId || '',
+				},
+				body: getResponseMessage('INVALID_API_TRAN_ID'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 400);
+			return NextResponse.json(response, { status: 400 });
 		}
 
 		const organization = await prisma.organization.findMany();
 
 		if (!organization) {
-			await logger(JSON.stringify(request), '', JSON.stringify(getResponseMessage('NO_ORGANIZATION_FOUND')), '404');
-			return NextResponse.json(getResponseMessage('NO_ORGANIZATION_FOUND'), { status: 404 });
+			const response = getResponseContent({
+				headers: {
+					contentType: 'application/json;charset=UTF-8',
+					xApiTranId: xApiTranId || '',
+				},
+				body: getResponseMessage('NO_ORGANIZATION_FOUND'),
+			});
+			await logger(JSON.stringify(request), JSON.stringify(response), 404);
+			return NextResponse.json(response, { status: 404 });
 		}
 
 		const responseData = {
@@ -74,11 +112,28 @@ export async function GET(req: NextRequest) {
 			org_list: organization,
 		};
 
-		await logger(JSON.stringify(request), '', JSON.stringify(responseData), '200');
+		const response = getResponseContent({
+			headers: {
+				contentType: 'application/json;charset=UTF-8',
+				xApiTranId: xApiTranId || '',
+			},
+			body: responseData,
+		});
 
-		return NextResponse.json(responseData, { status: 200 });
+		console.log('headers orgs', request.headers);
+		await logger(JSON.stringify(request), JSON.stringify(response), 200);
+
+		return NextResponse.json(response, { status: 200 });
 	} catch (error) {
-		await logger(JSON.stringify(request), '', JSON.stringify(getResponseMessage('INTERNAL_SERVER_ERROR')), '500');
-		return NextResponse.json(getResponseMessage('INTERNAL_SERVER_ERROR'), { status: 500 });
+		const response = getResponseContent({
+			headers: {
+				contentType: 'application/json;charset=UTF-8',
+				xApiTranId: xApiTranId || '',
+			},
+			body: getResponseMessage('INTERNAL_SERVER_ERROR'),
+		});
+		await logger(JSON.stringify(request), JSON.stringify(response), 500);
+
+		return NextResponse.json(response, { status: 500 });
 	}
 }
