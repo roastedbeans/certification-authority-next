@@ -17,10 +17,7 @@ export default function DetectionRuns() {
 	const [output, setOutput] = useState<string>('');
 	const [analysisSummary, setAnalysisSummary] = useState<DetectionSummary | null>(null);
 
-	const handleRun = async (
-		type: 'signature' | 'specification' | 'hybrid' | 'analysis' | 'ratelimit',
-		action: () => Promise<DetectionResult>
-	) => {
+	const handleRun = async (type: string, action: () => Promise<any>) => {
 		setLoading(type);
 		setResult(null);
 		setOutput('');

@@ -61,10 +61,10 @@ export async function GET(req: NextRequest) {
 
 		// Extract the token
 		const token = authorization.split(' ')[1];
-		let decodedToken;
+		let _decodedToken;
 
 		try {
-			decodedToken = jwt.verify(token, JWT_SECRET);
+			_decodedToken = jwt.verify(token, JWT_SECRET);
 		} catch (error) {
 			const response = getResponseContent({
 				headers: {

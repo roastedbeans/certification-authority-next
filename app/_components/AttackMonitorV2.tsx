@@ -125,17 +125,47 @@ const ConfusionMatrixVisualizer = ({
 			setSpecificationLogs(specificationLogsData);
 			setSignatureLogs(signatureLogsData);
 			setHybridLogs(hybridLogsData);
+
+			// Generate matrices with the updated data
+			const specificationMatrix = generateConfusionMatrix(specificationLogs, logs);
+			const signatureMatrix = generateConfusionMatrix(signatureLogs, logs);
+			const hybridMatrix = generateConfusionMatrix(hybridLogs, logs);
+
+			setSpecMatrix(specificationMatrix);
+			setSigMatrix(signatureMatrix);
+			setHybridMatrix(hybridMatrix);
+
+			// Update comparison data for the chart
+			setComparisonData([
+				{
+					name: 'Accuracy',
+					Specification: specificationMatrix.accuracy * 100,
+					Signature: signatureMatrix.accuracy * 100,
+					Hybrid: hybridMatrix.accuracy * 100,
+				},
+				{
+					name: 'Precision',
+					Specification: specificationMatrix.precision * 100,
+					Signature: signatureMatrix.precision * 100,
+					Hybrid: hybridMatrix.precision * 100,
+				},
+				{
+					name: 'Recall',
+					Specification: specificationMatrix.recall * 100,
+					Signature: signatureMatrix.recall * 100,
+					Hybrid: hybridMatrix.recall * 100,
+				},
+				{
+					name: 'F1 Score',
+					Specification: specificationMatrix.f1Score * 100,
+					Signature: signatureMatrix.f1Score * 100,
+					Hybrid: hybridMatrix.f1Score * 100,
+				},
+			]);
+
+			setLastUpdated(new Date().toLocaleTimeString());
 		}
-	}, [
-		logsData,
-		specificationLogsData,
-		signatureLogsData,
-		hybridLogsData,
-		logs,
-		specificationLogs,
-		signatureLogs,
-		hybridLogs,
-	]);
+	}, [logsData, specificationLogsData, signatureLogsData, hybridLogsData]);
 
 	// Fixed function that properly populates all matrix cells
 	const generateConfusionMatrix = (detectionLogs: LogRecord[], mainLogs: CALogRecord[]): ConfusionMatrix => {
@@ -444,7 +474,7 @@ const ConfusionMatrixVisualizer = ({
 										domain={[0, 100]}
 										unit='%'
 									/>
-									<Tooltip formatter={(value) => [`${Number(value).toFixed(1)}%`, undefined]} />
+									<Tooltip formatter={(value, _name, _props) => [`${Number(value).toFixed(1)}%`, undefined]} />
 									<Legend />
 									<Bar
 										dataKey='Specification'

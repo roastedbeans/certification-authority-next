@@ -50,21 +50,17 @@ export async function POST(req: NextRequest) {
 	const body = await req.json();
 
 	const {
-		sign_tx_id, // ORG2025001_CA20250001_20250117120000_RITFHJGITORP
-		user_ci, // e.g. 1234567890123456789012345678901234567890123456789012345678901234
+		sign_tx_id,
+		user_ci,
 		real_name,
-		phone_num, // E.164 standard applied, e.g. +821012345678
-		request_title, // e.g. "Request for personal information"
-		device_code, // PC - authorized method, TB - tablet, MO - mobile (default)
-		device_browser, // WB - web browser, NA - native app (default), HY - mobile
-		return_app_scheme_url, // e.g. mydata://auth
-		consent_cnt, // Length of consent_list
-		consent_type, // 0: Original text, 1: Hash value (SHA-256)
-		consent_list, // List of consents
-		// --consent "958675948576879"
-		// --consent_len Number of characters in consent
-		// --consent_title e.g. "Consent to share personal information"
-		// --tx_id MD1234567890_0987654321_1234567890_20250117120000_E349RU3IDKFJ
+		phone_num,
+		request_title,
+		device_code,
+		device_browser,
+		return_app_scheme_url,
+		consent_cnt,
+		consent_type,
+		consent_list,
 	} = body;
 
 	const request = {

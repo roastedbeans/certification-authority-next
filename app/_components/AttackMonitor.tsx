@@ -66,7 +66,7 @@ const LogMonitor = () => {
 				<Card className='w-full'>
 					<CardHeader className='font-semibold justify-between items-center flex flex-row'>
 						<span>Certification Authority API Logs</span>
-						<span>Count: {logs.filter((log) => log['attack.type'] !== '').length} (Attacks)</span>
+						<span>Count: {logs.filter((_) => _['attack.type'] !== '').length} (Attacks)</span>
 					</CardHeader>
 					<CardContent className='w-full'>
 						<div className='flex flex-col pr-2 h-[680px] overflow-y-scroll'>
