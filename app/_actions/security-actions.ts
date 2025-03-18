@@ -4,12 +4,12 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
-import { startSpecificationDetection } from '@/scripts/detectionSpecification';
+import { startSpecificationDetection } from '@/scripts/detection-algorithms/detectionSpecification';
 import { filePath } from '@/scripts/utils';
-import { startHybridDetection } from '@/scripts/detectionHybrid';
-import { startSignatureDetection } from '@/scripts/detectionSignature';
-import { analyzeSecurityLogs } from '@/scripts/runAnalysis';
-import { startRateLimitDetection } from '@/scripts/slidingWindowRateLimit';
+import { startHybridDetection } from '@/scripts/detection-algorithms/detectionHybrid';
+import { startSignatureDetection } from '@/scripts/detection-algorithms/detectionSignature';
+import { analyzeSecurityLogs } from '@/scripts/analysis/runAnalysis';
+import { startRateLimitDetection } from '@/scripts/detection-algorithms/slidingWindowRateLimit';
 
 const execPromise = promisify(exec);
 

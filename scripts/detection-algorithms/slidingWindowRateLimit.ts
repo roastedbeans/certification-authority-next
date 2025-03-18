@@ -8,7 +8,7 @@ import {
 	readNewCSVLogEntries,
 	FilePosition,
 	logDetectionResult,
-} from './utils';
+} from '../utils';
 
 /**
  * Enhanced Rate Limiting Implementation Using Sliding Window Strategy

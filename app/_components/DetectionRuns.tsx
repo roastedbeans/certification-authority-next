@@ -9,7 +9,7 @@ import {
 	runRateLimitDetection,
 	DetectionResult,
 } from '../_actions/security-actions';
-import { DetectionSummary } from '@/scripts/runAnalysis';
+import { DetectionSummary } from '@/scripts/analysis/runAnalysis';
 
 export default function DetectionRuns() {
 	const [loading, setLoading] = useState<string | null>(null);

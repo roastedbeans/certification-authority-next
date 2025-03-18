@@ -9,7 +9,7 @@ import {
 	logDetectionResult,
 	RequestData,
 	detectionCSVLoggerHeader,
-} from './utils';
+} from '../utils';
 
 // Specification-based Detection Implementation
 export class SpecificationBasedDetection {

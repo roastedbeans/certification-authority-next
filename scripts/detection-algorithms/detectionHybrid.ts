@@ -1,4 +1,4 @@
-import { filePath, LogEntry, FilePosition, initializeCSV, readNewCSVLogEntries, logDetectionResult } from './utils';
+import { filePath, LogEntry, FilePosition, initializeCSV, readNewCSVLogEntries, logDetectionResult } from '../utils';
 import { SpecificationBasedDetection } from './detectionSpecification';
 import { SignatureBasedDetection } from './detectionSignature';
 

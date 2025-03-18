@@ -8,7 +8,7 @@ import {
 	initializeCSV,
 	readNewCSVLogEntries,
 	logDetectionResult,
-} from './utils';
+} from '../utils';
 import { securityPatterns } from './security-patterns';
 // Signature-based Detection Implementation
 export class SignatureBasedDetection {
