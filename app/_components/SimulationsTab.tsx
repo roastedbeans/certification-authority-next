@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, CheckCircle, Play, ChevronDown, ChevronUp, Loader } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { runSimulation, type ConfigVars, type Direction, getVariables } from '@/app/_actions/simulation-actions';
 
 export default function SimulationsTab() {
-	const [direction, setDirection] = useState('anya-to-bond');
+	const [direction, setDirection] = useState<Direction>('anya-to-bond');
 	const [isRunning, setIsRunning] = useState(false);
 	const [status, setStatus] = useState<null | { type: 'success' | 'error'; message: string }>(null);
 	const [logs, setLogs] = useState<string[]>([]);
@@ -15,33 +16,41 @@ export default function SimulationsTab() {
 	const [iterations, setIterations] = useState(5); // Default number of iterations
 
 	// Default configuration values
-	const defaultConfig = {
-		'anya-to-bond': {
-			ANYA_ORG_CODE: 'anyabank00',
-			BOND_ORG_CODE: 'bondbank00',
-			CA_CODE: 'certauth00',
-			BOND_BANK_API: 'http://localhost:3001',
-			ANYA_ORG_SERIAL_CODE: 'anyaserial00',
-			ANYA_CLIENT_ID: 'client_anyabank00',
-			ANYA_CLIENT_SECRET: 'secret_anyabank00',
-		},
-		'bond-to-anya': {
-			ANYA_ORG_CODE: 'bondbank00',
-			BOND_ORG_CODE: 'anyabank00',
-			CA_CODE: 'certauth00',
-			BOND_BANK_API: 'http://localhost:3000',
-			ANYA_ORG_SERIAL_CODE: 'bondserial00',
-			ANYA_CLIENT_ID: 'client_bondbank00',
-			ANYA_CLIENT_SECRET: 'secret_bondbank00',
-		},
-	};
+	const [config, setConfig] = useState<ConfigVars>({
+		otherBankAPI: '',
+		otherOrgCode: '',
+		orgCode: '',
+		orgSerialCode: '',
+		clientId: '',
+		clientSecret: '',
+	});
 
-	// State for custom configuration
-	const [config, setConfig] = useState(defaultConfig['anya-to-bond']);
+	// Load initial config
+	useEffect(() => {
+		const loadConfig = async () => {
+			try {
+				const initialConfig = await getVariables(direction);
+				setConfig(initialConfig);
+			} catch (error) {
+				console.error('Error loading initial config:', error);
+			}
+		};
+
+		loadConfig();
+	}, []);
 
 	// Update config when direction changes
-	React.useEffect(() => {
-		setConfig(defaultConfig[direction as keyof typeof defaultConfig]);
+	useEffect(() => {
+		const updateConfig = async () => {
+			try {
+				const newConfig = await getVariables(direction);
+				setConfig(newConfig);
+			} catch (error) {
+				console.error('Error updating config:', error);
+			}
+		};
+
+		updateConfig();
 	}, [direction]);
 
 	// Handle config field changes
@@ -53,11 +62,16 @@ export default function SimulationsTab() {
 	};
 
 	// Reset config to defaults
-	const resetConfig = () => {
-		setConfig(defaultConfig[direction as keyof typeof defaultConfig]);
+	const resetConfig = async () => {
+		try {
+			const defaultConfig = await getVariables(direction);
+			setConfig(defaultConfig);
+		} catch (error) {
+			console.error('Error resetting config:', error);
+		}
 	};
 
-	const runSimulation = async (type: 'normal' | 'attack') => {
+	const runSimulationHandler = async (type: 'normal' | 'attack') => {
 		try {
 			// Reset state
 			setIsRunning(true);
@@ -66,7 +80,6 @@ export default function SimulationsTab() {
 
 			// Add initial log
 			const directionText = direction === 'anya-to-bond' ? 'Anya Bank to Bond Bank' : 'Bond Bank to Anya Bank';
-
 			setLogs((prev) => [...prev, `Starting ${type} simulation (${directionText}) with ${iterations} iterations...`]);
 
 			// Create a copy of the config and add iterations
@@ -75,40 +88,22 @@ export default function SimulationsTab() {
 				ITERATIONS: iterations.toString(),
 			};
 
-			// Call the API to run the simulation
-			const response = await fetch('/api/simulations/run', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					type,
-					direction,
-					config: runConfig,
-					iterations,
-				}),
+			// Run the simulation using the server action
+			const result = await runSimulation({
+				type,
+				direction,
+				config: runConfig,
+				iterations,
 			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.message || 'Failed to run simulation');
-			}
-
-			const data = await response.json();
 
 			// Success
 			setStatus({
 				type: 'success',
-				message: `${type.charAt(0).toUpperCase() + type.slice(1)} simulation completed successfully!`,
+				message: result?.message || '',
 			});
 
 			// Add completion log
 			setLogs((prev) => [...prev, `Simulation completed successfully`]);
-
-			// Add any logs from the server response if available
-			if (data.logs && Array.isArray(data.logs)) {
-				setLogs((prev) => [...prev, ...data.logs]);
-			}
 		} catch (error) {
 			console.error('Simulation error:', error);
 			setStatus({
@@ -143,7 +138,7 @@ export default function SimulationsTab() {
 									value='anya-to-bond'
 									id='anya-to-bond'
 									checked={direction === 'anya-to-bond'}
-									onChange={(e) => setDirection(e.target.value)}
+									onChange={(e) => setDirection(e.target.value as Direction)}
 									className='h-4 w-4 text-primary border-gray-300 focus:ring-primary'
 									disabled={isRunning}
 								/>
@@ -156,7 +151,7 @@ export default function SimulationsTab() {
 									value='bond-to-anya'
 									id='bond-to-anya'
 									checked={direction === 'bond-to-anya'}
-									onChange={(e) => setDirection(e.target.value)}
+									onChange={(e) => setDirection(e.target.value as Direction)}
 									className='h-4 w-4 text-primary border-gray-300 focus:ring-primary'
 									disabled={isRunning}
 								/>
@@ -237,7 +232,7 @@ export default function SimulationsTab() {
 						<h3 className='text-lg font-medium mb-4'>Run Simulations</h3>
 						<div className='flex space-x-4'>
 							<Button
-								onClick={() => runSimulation('normal')}
+								onClick={() => runSimulationHandler('normal')}
 								disabled={isRunning}
 								className='flex items-center space-x-2'>
 								{isRunning ? <Loader className='h-4 w-4 animate-spin' /> : <Play size={16} />}
@@ -245,7 +240,7 @@ export default function SimulationsTab() {
 							</Button>
 
 							<Button
-								onClick={() => runSimulation('attack')}
+								onClick={() => runSimulationHandler('attack')}
 								disabled={isRunning}
 								variant='destructive'
 								className='flex items-center space-x-2'>

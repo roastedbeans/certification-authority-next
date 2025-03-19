@@ -153,7 +153,7 @@ export async function getDetectionLogs(
 ): Promise<{ logs: LogEntry[]; error?: string }> {
 	try {
 		let allLogs: LogEntry[] = [];
-		let lastModified = new Map<string, Date>();
+		const lastModified = new Map<string, Date>();
 
 		if (type === 'signature' || type === 'all') {
 			const signatureFile = path.join(publicPath, 'signature_detection_logs.csv');
@@ -206,7 +206,6 @@ async function readCsvLogFile(filePath: string): Promise<LogEntry[]> {
 		const lines = fileContent.split('\n');
 		const headers = lines[0].split(',');
 
-		console.log('headers', headers);
 		return lines
 			.slice(1)
 			.filter((line) => line.trim() !== '')
