@@ -310,7 +310,7 @@ export async function POST(req: NextRequest) {
 		const serialNumber = sign_tx_id.split('_')[3];
 
 		try {
-			const result = await prisma.$transaction(async (tx) => {
+			const result = await prisma.$transaction(async (tx: any) => {
 				let userResponse;
 				const existingUser = await tx.user.findFirst({
 					where: {

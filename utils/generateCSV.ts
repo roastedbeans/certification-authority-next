@@ -68,8 +68,6 @@ export const logger = async (request: string, response: string, status: number) 
 		console.error('Error formatting request/response bodies:', error);
 	}
 
-	console.log('formattedRequestBody', formattedRequestBody);
-
 	await csvWriter.writeRecords([
 		{
 			timestamp: new Date().toISOString(),

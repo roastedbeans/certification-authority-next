@@ -2,6 +2,15 @@ import { PrismaClient } from '@prisma/client';
 import { faker } from '@faker-js/faker';
 import dayjs from 'dayjs';
 
+// Create PrismaClient singleton to prevent multiple instances during hot reloading
+const globalForPrisma = globalThis as unknown as {
+	prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
 // Logger utility
 const logger = {
 	error: (message: string, error?: any) => {
@@ -102,16 +111,6 @@ export type SignedConsent = {
 	signed_consent: string;
 	signed_consent_len: number;
 };
-
-// Initialize Prisma and constants
-const prisma = new PrismaClient();
-const bondBankAPI = process.env.BOND_BANK_API || '';
-const bondOrgCode = process.env.BOND_ORG_CODE || '';
-const orgCode = process.env.ANYA_ORG_CODE || '';
-const caCode = process.env.CA_CODE || '';
-const orgSerialCode = process.env.ANYA_ORG_SERIAL_CODE || '';
-const clientId = process.env.ANYA_CLIENT_ID || '';
-const clientSecret = process.env.ANYA_CLIENT_SECRET || '';
 
 // Validation functions
 const validateBodyIA102 = (body: BodyIA102): void => {
@@ -235,7 +234,7 @@ const processPayload = (value: any, attack: AttackConfiguration | null, location
 };
 
 // Generate transaction ID with error handling
-export const generateTIN = (subject: string): string => {
+export const generateTIN = (subject: string, orgCode: string): string => {
 	//subject classification code
 	try {
 		const date = new Date();
@@ -265,7 +264,7 @@ export function timestamp(date: Date): string {
 }
 
 // API Functions aligned with simulate.ts but keeping attack simulation
-export const getIA101 = async () => {
+export const getIA101 = async (orgCode: string, clientId: string, clientSecret: string) => {
 	try {
 		const attackLocations = [
 			'x-api-tran-id',
@@ -285,7 +284,7 @@ export const getIA101 = async () => {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				'X-CSRF-Token': processPayload('', attack, 'X-CSRF-Token'),
 				Cookie: processPayload('', attack, 'Cookie'),
 				'Set-Cookie': processPayload('', attack, 'Set-Cookie'),
@@ -317,7 +316,7 @@ export const getIA101 = async () => {
 };
 
 // Normal simulation for IA102 with attack functionality
-export const getIA102 = async (accessToken: string, body: BodyIA102) => {
+export const getIA102 = async (accessToken: string, body: BodyIA102, orgCode: string) => {
 	try {
 		if (!accessToken) throw new ValidationError('Access token is required');
 		validateBodyIA102(body);
@@ -330,7 +329,7 @@ export const getIA102 = async (accessToken: string, body: BodyIA102) => {
 			headers: {
 				'Access-Control-Allow-Origin': '*',
 				'Content-Type': 'application/json;charset=UTF-8',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				'X-CSRF-Token': processPayload('', attack, 'X-CSRF-Token'),
 				Cookie: processPayload('', attack, 'Cookie'),
 				'Set-Cookie': processPayload('', attack, 'Set-Cookie'),
@@ -357,7 +356,7 @@ export const getIA102 = async (accessToken: string, body: BodyIA102) => {
 	}
 };
 
-export const getIA103 = async (accessToken: string, body: BodyIA103) => {
+export const getIA103 = async (accessToken: string, body: BodyIA103, orgCode: string) => {
 	try {
 		if (!accessToken) throw new ValidationError('Access token is required');
 		validateBodyIA103(body);
@@ -370,7 +369,7 @@ export const getIA103 = async (accessToken: string, body: BodyIA103) => {
 			headers: {
 				'Access-Control-Allow-Origin': '*',
 				'Content-Type': 'application/json;charset=UTF-8',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				'X-CSRF-Token': processPayload('', attack, 'X-CSRF-Token'),
 				Cookie: processPayload('', attack, 'Cookie'),
 				'Set-Cookie': processPayload('', attack, 'Set-Cookie'),
@@ -397,7 +396,7 @@ export const getIA103 = async (accessToken: string, body: BodyIA103) => {
 	}
 };
 
-export const getIA002 = async (body: BodyIA002) => {
+export const getIA002 = async (body: BodyIA002, otherBankAPI: string, orgCode: string) => {
 	try {
 		validateBodyIA002(body);
 
@@ -408,7 +407,7 @@ export const getIA002 = async (body: BodyIA002) => {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				'X-CSRF-Token': processPayload('', attack, 'X-CSRF-Token'),
 				Cookie: processPayload('', attack, 'Cookie'),
 				'Set-Cookie': processPayload('', attack, 'Set-Cookie'),
@@ -418,7 +417,7 @@ export const getIA002 = async (body: BodyIA002) => {
 			body: new URLSearchParams(body),
 		};
 
-		const response = await fetch(`${bondBankAPI}/api/oauth/2.0/token`, options);
+		const response = await fetch(`${otherBankAPI}/api/oauth/2.0/token`, options);
 
 		if (!response.ok) {
 			// Handle HTTP errors
@@ -433,7 +432,7 @@ export const getIA002 = async (body: BodyIA002) => {
 	}
 };
 
-export const getIA104 = async (accessToken: string, body: BodyIA104) => {
+export const getIA104 = async (accessToken: string, body: BodyIA104, orgCode: string) => {
 	try {
 		if (!accessToken) throw new ValidationError('Access token is required');
 		validateBodyIA104(body);
@@ -446,7 +445,7 @@ export const getIA104 = async (accessToken: string, body: BodyIA104) => {
 			headers: {
 				'Access-Control-Allow-Origin': '*',
 				'Content-Type': 'application/json;charset=UTF-8',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				'X-CSRF-Token': processPayload('', attack, 'X-CSRF-Token'),
 				Cookie: processPayload('', attack, 'Cookie'),
 				'Set-Cookie': processPayload('', attack, 'Set-Cookie'),
@@ -472,7 +471,7 @@ export const getIA104 = async (accessToken: string, body: BodyIA104) => {
 	}
 };
 
-export async function getSupport001() {
+export async function getSupport001(orgCode: string, clientId: string, clientSecret: string) {
 	try {
 		const attackLocations = [
 			'x-api-tran-id',
@@ -492,7 +491,7 @@ export async function getSupport001() {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				'X-CSRF-Token': processPayload('', attack, 'X-CSRF-Token'),
 				Cookie: processPayload('', attack, 'Cookie'),
 				'Set-Cookie': processPayload('', attack, 'Set-Cookie'),
@@ -523,9 +522,9 @@ export async function getSupport001() {
 	}
 }
 
-export async function getSupport002() {
+export async function getSupport002(orgCode: string, clientId: string, clientSecret: string) {
 	try {
-		const support001Response = await getSupport001();
+		const support001Response = await getSupport001(orgCode, clientId, clientSecret);
 
 		const { access_token } = support001Response?.body;
 		if (!access_token) {
@@ -547,7 +546,7 @@ export async function getSupport002() {
 			headers: {
 				'Access-Control-Allow-Origin': '*',
 				'Content-Type': 'application/json;charset=UTF-8',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				Cookie: processPayload('', attack, 'Cookie'),
 				'Set-Cookie': processPayload('', attack, 'Set-Cookie'),
 				'User-Agent': processPayload('Mozilla/5.0', attack, 'User-Agent'),
@@ -578,7 +577,13 @@ export async function getSupport002() {
 	}
 }
 
-const getAccountsBasic = async (orgCode: string, accountNum: string, accessToken: string) => {
+const getAccountsBasic = async (
+	orgCode: string,
+	accountNum: string,
+	accessToken: string,
+	otherOrgCode: string,
+	otherBankAPI: string
+) => {
 	try {
 		if (!orgCode) throw new ValidationError('Organization code is required');
 		if (!accountNum) throw new ValidationError('Account number is required');
@@ -591,7 +596,7 @@ const getAccountsBasic = async (orgCode: string, accountNum: string, accessToken
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json;charset=UTF-8',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				'x-api-type': processPayload(faker.helpers.arrayElement(['regular', 'irregular']), attack, 'x-api-type'),
 				'X-CSRF-Token': processPayload('', attack, 'X-CSRF-Token'),
 				Cookie: processPayload('', attack, 'Cookie'),
@@ -601,7 +606,7 @@ const getAccountsBasic = async (orgCode: string, accountNum: string, accessToken
 				Authorization: `Bearer ${accessToken}`,
 			},
 			body: JSON.stringify({
-				org_code: bondOrgCode,
+				org_code: otherOrgCode,
 				account_num: accountNum,
 				next: '0',
 				search_timestamp: timestamp(new Date()),
@@ -609,7 +614,7 @@ const getAccountsBasic = async (orgCode: string, accountNum: string, accessToken
 		};
 
 		logger.info('Getting basic account information');
-		const response = await fetch(`${bondBankAPI}/api/v2/bank/accounts/deposit/basic`, options);
+		const response = await fetch(`${otherBankAPI}/api/v2/bank/accounts/deposit/basic`, options);
 
 		if (!response.ok) {
 			// Handle HTTP errors
@@ -624,7 +629,13 @@ const getAccountsBasic = async (orgCode: string, accountNum: string, accessToken
 	}
 };
 
-const getAccountsDetail = async (orgCode: string, accountNum: string, accessToken: string) => {
+const getAccountsDetail = async (
+	orgCode: string,
+	accountNum: string,
+	accessToken: string,
+	otherOrgCode: string,
+	otherBankAPI: string
+) => {
 	try {
 		if (!orgCode) throw new ValidationError('Organization code is required');
 		if (!accountNum) throw new ValidationError('Account number is required');
@@ -645,7 +656,7 @@ const getAccountsDetail = async (orgCode: string, accountNum: string, accessToke
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json;charset=UTF-8',
-				'x-api-tran-id': processPayload(generateTIN('S'), attack, 'x-api-tran-id'),
+				'x-api-tran-id': processPayload(generateTIN('S', orgCode), attack, 'x-api-tran-id'),
 				'x-api-type': processPayload(faker.helpers.arrayElement(['regular', 'irregular']), attack, 'x-api-type'),
 				'X-CSRF-Token': processPayload('', attack, 'X-CSRF-Token'),
 				Cookie: processPayload('', attack, 'Cookie'),
@@ -655,7 +666,7 @@ const getAccountsDetail = async (orgCode: string, accountNum: string, accessToke
 				Authorization: `Bearer ${accessToken}`,
 			},
 			body: JSON.stringify({
-				org_code: bondOrgCode,
+				org_code: otherOrgCode,
 				account_num: accountNum,
 				next: '0',
 				search_timestamp: processPayload(timestamp(new Date()), attack, 'search_timestamp'),
@@ -663,7 +674,7 @@ const getAccountsDetail = async (orgCode: string, accountNum: string, accessToke
 		};
 
 		logger.info('Getting detailed account information');
-		const response = await fetch(`${bondBankAPI}/api/v2/bank/accounts/deposit/detail`, options);
+		const response = await fetch(`${otherBankAPI}/api/v2/bank/accounts/deposit/detail`, options);
 
 		if (!response.ok) {
 			// Handle HTTP errors
@@ -679,7 +690,12 @@ const getAccountsDetail = async (orgCode: string, accountNum: string, accessToke
 };
 
 // Generate BodyIA102 with error handling (keeping from original simulateV2)
-export const generateBodyIA102 = async (account: any): Promise<BodyIA102> => {
+export const generateBodyIA102 = async (
+	account: any,
+	orgCode: string,
+	otherOrgCode: string,
+	otherBankAPI: string
+): Promise<BodyIA102> => {
 	try {
 		if (!account) throw new ValidationError('Account is required');
 
@@ -718,7 +734,9 @@ export const generateBodyIA102 = async (account: any): Promise<BodyIA102> => {
 		const consent_list = Array.from({ length: numConsents }, (_, index) => {
 			const consent = faker.helpers.arrayElement(consentValues);
 			const shaConsent = Buffer.from(consent).toString('base64');
-			const txId = `MD_${orgCode}_${bondOrgCode}_${relayAgencyCode}_${caCode}_${newTimestamp}_${'XXAB0049000' + index}`;
+			const txId = `MD_${orgCode}_${otherOrgCode}_${relayAgencyCode}_${caCode}_${newTimestamp}_${
+				'XXAB0049000' + index
+			}`;
 
 			return {
 				tx_id: txId,
@@ -864,11 +882,17 @@ const generateBodyIA104 = async (certTxId: string, consent_list: any, signed_con
 };
 
 // Main simulation function with comprehensive error handling
-async function main() {
+async function main(
+	orgCode: string,
+	clientId: string,
+	clientSecret: string,
+	otherOrgCode: string,
+	otherBankAPI: string
+) {
 	try {
 		// Interaction 1: User wants to sign up
 		logger.info('Starting simulation: User sign-up');
-		const response = await getSupport002();
+		const response = await getSupport002(orgCode, clientId, clientSecret);
 
 		if (!response) {
 			throw new Error('Error fetching organization list');
@@ -876,7 +900,7 @@ async function main() {
 
 		// Interaction 2: User wants to connect their accounts to the selected banks
 		logger.info('Starting simulation: Connect accounts to banks');
-		const IA101Response = await getIA101();
+		const IA101Response = await getIA101(orgCode, clientId, clientSecret);
 
 		const { access_token } = IA101Response?.body;
 
@@ -901,9 +925,9 @@ async function main() {
 		const account = faker.helpers.arrayElement(accounts);
 		const accountNum = account.accountNum;
 
-		const bodyIA102 = await generateBodyIA102(account);
+		const bodyIA102 = await generateBodyIA102(account, orgCode, otherOrgCode, otherBankAPI);
 
-		const responseIA102 = await getIA102(access_token, bodyIA102);
+		const responseIA102 = await getIA102(access_token, bodyIA102, orgCode);
 		if (!responseIA102) {
 			throw new Error('Error sign request in IA102');
 		}
@@ -916,7 +940,7 @@ async function main() {
 			cert_tx_id: responseIA102?.body?.cert_tx_id,
 		};
 
-		const responseIA103 = await getIA103(access_token, bodyIA103);
+		const responseIA103 = await getIA103(access_token, bodyIA103, orgCode);
 		if (!responseIA103) {
 			throw new Error('Error sign result in IA103');
 		}
@@ -932,7 +956,7 @@ async function main() {
 		const consentList = bodyIA102?.consent_list;
 
 		const bodyIA002 = await generateBodyIA002(certTxId, consentList, signedConsentList);
-		const responseIA002 = await getIA002(bodyIA002);
+		const responseIA002 = await getIA002(bodyIA002, otherBankAPI, orgCode);
 
 		if (!responseIA002) {
 			throw new Error('Error request for access token in IA002');
@@ -945,7 +969,7 @@ async function main() {
 		logger.info('Starting simulation: Sign verification');
 
 		const bodyIA104 = await generateBodyIA104(certTxId, consentList, signedConsentList);
-		const responseIA104 = await getIA104(responseIA002?.body?.access_token, bodyIA104);
+		const responseIA104 = await getIA104(responseIA002?.body?.access_token, bodyIA104, orgCode);
 
 		if (!responseIA104) {
 			throw new Error('Error sign verification in IA104');
@@ -969,7 +993,13 @@ async function main() {
 			if (isGetBasic) {
 				// Call for basic account information
 				console.log('Getting basic account information');
-				const accountsBasic = await getAccountsBasic(orgCode, accountNum, responseIA002.body.access_token);
+				const accountsBasic = await getAccountsBasic(
+					orgCode,
+					accountNum,
+					responseIA002.body.access_token,
+					otherOrgCode,
+					otherBankAPI
+				);
 				if (!accountsBasic) {
 					throw new Error('Error fetching basic account information');
 				}
@@ -981,7 +1011,13 @@ async function main() {
 			if (isGetDetail) {
 				// Call for detailed account information
 				console.log('Getting detailed account information');
-				const accountsDetail = await getAccountsDetail(orgCode, accountNum, responseIA002.body.access_token);
+				const accountsDetail = await getAccountsDetail(
+					orgCode,
+					accountNum,
+					responseIA002.body.access_token,
+					otherOrgCode,
+					otherBankAPI
+				);
 				if (!accountsDetail) {
 					throw new Error('Error fetching detailed account information');
 				}
@@ -1009,45 +1045,40 @@ async function main() {
 }
 
 // Run iterations with retry logic
-async function runIterations() {
-	const iterations = 100; // Number of iterations - kept consistent with simulate.ts
+export async function runAttackIterations(
+	iterations: number = 100,
+	orgCode: string,
+	clientId: string,
+	clientSecret: string,
+	otherOrgCode: string,
+	otherBankAPI: string
+) {
 	const delayBetweenIterations = 1000; // Delay between iterations in milliseconds (e.g., 1 second)
-	const maxRetries = 3;
 
 	for (let i = 0; i < iterations; i++) {
-		let retries = 0;
-		let success = false;
-
-		while (retries < maxRetries && !success) {
-			try {
-				await main(); // Run the main function
-				logger.info(`Iteration ${i + 1} completed successfully.`);
-				success = true;
-			} catch (error) {
-				retries++;
-				if (retries === maxRetries) {
-					logger.error(`Iteration ${i + 1} failed after ${maxRetries} retries`, error);
-				} else {
-					logger.warn(`Retry ${retries} for iteration ${i + 1}`);
-					await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
-				}
-			}
+		try {
+			await main(orgCode, clientId, clientSecret, otherOrgCode, otherBankAPI); // Run the main function
+			console.log(`Attack iteration ${i + 1} completed.`);
+		} catch (error) {
+			console.error(`Error in attack iteration ${i + 1}:`, error);
 		}
 
 		// Add a delay between iterations to avoid overwhelming the system
 		await new Promise((resolve) => setTimeout(resolve, delayBetweenIterations));
 	}
 
-	logger.info('All iterations completed.');
+	console.log('All attack iterations completed.');
 }
 
-// Run the iterations
-runIterations()
-	.catch((e) => {
-		logger.error('Error during iterations:', e);
-		process.exit(1);
-	})
-	.finally(async () => {
-		await prisma.$disconnect();
-		logger.info('Prisma disconnected successfully');
-	});
+// // Only run if this is the main module
+// if (require.main === module) {
+// 	// Run the iterations
+// 	runIterations()
+// 		.catch((e) => {
+// 			console.error('Error during attack iterations:', e);
+// 			process.exit(1);
+// 		})
+// 		.finally(async () => {
+// 			await prisma.$disconnect();
+// 		});
+// }

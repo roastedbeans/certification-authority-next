@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -57,13 +56,13 @@ model Certificate {
   revoked                Boolean              @default(false)
   revokedAt              DateTime?
   revocationReason       String?
+  certificateAuthorityId String
+  certificateAuthority   CertificateAuthority @relation(fields: [certificateAuthorityId], references: [id])
   user                   User                 @relation(fields: [userId], references: [id])
   consentList            Consent[]
   logs                   Log[]
   revocationEntries      Revocation[]
   signedConsentList      SignedConsent[]
-  certificateAuthorityId String
-  certificateAuthority   CertificateAuthority @relation(fields: [certificateAuthorityId], references: [id])
 }
 
 model Consent {
