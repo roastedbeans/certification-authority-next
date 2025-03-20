@@ -36,6 +36,7 @@ async function detectIntrusions(entry: LogEntry): Promise<void> {
 export async function startHybridDetection(logFilePath: string) {
 	try {
 		await initializeCSV(filePath('/public/hybrid_detection_logs.csv'), 'detection');
+
 		const filePosition = new FilePosition();
 
 		// First, read the entire file initially to catch up
@@ -52,7 +53,12 @@ export async function startHybridDetection(logFilePath: string) {
 				console.log(`Processing batch ${i / batchSize + 1}/${Math.ceil(initialEntries.length / batchSize)}`);
 
 				for (const entry of batch) {
-					await detectIntrusions(entry);
+					try {
+						await detectIntrusions(entry);
+					} catch (error) {
+						console.error('Error during intrusion detection:', error);
+						// Continue processing other entries
+					}
 				}
 			}
 		} else {
@@ -62,6 +68,7 @@ export async function startHybridDetection(logFilePath: string) {
 		return 'done';
 	} catch (error) {
 		console.error('Error starting detection:', error);
-		return 'error';
+		// Don't just return 'error', return the actual error message for better debugging
+		return String(error);
 	}
 }

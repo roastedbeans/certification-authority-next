@@ -195,18 +195,49 @@ export async function readNewCSVLogEntries(filePath: string, filePosition: FileP
 
 // Initialize CSV
 export async function initializeCSV(filePath: string, header: 'ratelimit' | 'detection'): Promise<void> {
-	let headerArray: any[] = [];
-	if (header === 'ratelimit') {
-		headerArray = rateLimitCSVLoggerHeader;
-	} else {
-		headerArray = detectionCSVLoggerHeader;
-	}
-	if (!fs.existsSync(filePath)) {
-		const csvWriter = createCsvWriter({
-			path: filePath,
-			header: headerArray,
-		});
-		await csvWriter.writeRecords([]);
+	try {
+		let headerArray: any[] = [];
+		if (header === 'ratelimit') {
+			headerArray = rateLimitCSVLoggerHeader;
+		} else {
+			headerArray = detectionCSVLoggerHeader;
+		}
+
+		// Ensure directory exists
+		const dirPath = path.dirname(filePath);
+		try {
+			if (!fs.existsSync(dirPath)) {
+				fs.mkdirSync(dirPath, { recursive: true });
+				console.log(`Created directory: ${dirPath}`);
+			}
+		} catch (dirError) {
+			console.error(`Error creating directory ${dirPath}:`, dirError);
+			// If we can't create the directory, we can't initialize the CSV
+			return;
+		}
+
+		if (!fs.existsSync(filePath)) {
+			try {
+				const csvWriter = createCsvWriter({
+					path: filePath,
+					header: headerArray,
+				});
+				await csvWriter.writeRecords([]);
+				console.log(`Initialized CSV file: ${filePath}`);
+			} catch (error) {
+				console.error(`Error initializing CSV file ${filePath}:`, error);
+				// Try to create empty file manually if csvWriter fails
+				try {
+					const headerRow = headerArray.map((h) => h.title).join(',') + '\n';
+					fs.writeFileSync(filePath, headerRow);
+					console.log(`Manually created CSV file: ${filePath}`);
+				} catch (writeError) {
+					console.error(`Failed manual creation of ${filePath}:`, writeError);
+				}
+			}
+		}
+	} catch (error) {
+		console.error(`Error in initializeCSV for ${filePath}:`, error);
 	}
 }
 
@@ -231,29 +262,74 @@ export async function logDetectionResult(
 	detectionType: 'signature' | 'specification' | 'hybrid' | 'ratelimit',
 	result: DetectionResult
 ): Promise<void> {
-	if (!fs.existsSync(filePath(`/public/${detectionType}_detection_logs.csv`))) {
-		fs.writeFileSync(
-			filePath(`/public/${detectionType}_detection_logs.csv`),
-			'timestamp,detectionType,detected,reason,request,response\n'
-		);
+	try {
+		const logFilePath = filePath(`/public/${detectionType}_detection_logs.csv`);
+		const dirPath = path.dirname(logFilePath);
+
+		// Ensure directory exists
+		try {
+			if (!fs.existsSync(dirPath)) {
+				fs.mkdirSync(dirPath, { recursive: true });
+				console.log(`Created directory: ${dirPath}`);
+			}
+		} catch (dirError) {
+			console.error(`Error creating directory ${dirPath}:`, dirError);
+			// Continue execution - try to write to file anyway
+		}
+
+		if (!fs.existsSync(logFilePath)) {
+			try {
+				fs.writeFileSync(logFilePath, 'timestamp,detectionType,detected,reason,request,response\n');
+				console.log(`Created log file: ${logFilePath}`);
+			} catch (fileError) {
+				console.error(`Error creating log file ${logFilePath}:`, fileError);
+				// If we can't create the file, there's no point in trying to write to it
+				return;
+			}
+		}
+
+		const csvWriter2 = createCsvWriter({
+			path: logFilePath,
+			append: true,
+			header: detectionCSVLoggerHeader,
+		});
+
+		const record: LogRecord = {
+			timestamp: new Date().toISOString(),
+			detectionType: detectionType,
+			detected: result.detected,
+			reason: result.reason,
+			request: JSON.stringify(entry.request),
+			response: JSON.stringify(entry.response),
+		};
+
+		await csvWriter2.writeRecords([record]);
+	} catch (error) {
+		console.error(`Error logging detection result for ${detectionType}:`, error);
+		// Log to an alternative location if the main one failed
+		try {
+			const fallbackPath = filePath(`/logs/${detectionType}_detection_fallback.json`);
+			const fallbackDir = path.dirname(fallbackPath);
+
+			if (!fs.existsSync(fallbackDir)) {
+				fs.mkdirSync(fallbackDir, { recursive: true });
+			}
+
+			const fallbackData = {
+				timestamp: new Date().toISOString(),
+				detectionType,
+				detected: result.detected,
+				reason: result.reason,
+				request: JSON.stringify(entry.request),
+				response: JSON.stringify(entry.response),
+			};
+
+			fs.appendFileSync(fallbackPath, JSON.stringify(fallbackData) + '\n');
+			console.log(`Logged to fallback location: ${fallbackPath}`);
+		} catch (fallbackError) {
+			console.error('Even fallback logging failed:', fallbackError);
+		}
 	}
-
-	const csvWriter2 = createCsvWriter({
-		path: filePath(`/public/${detectionType}_detection_logs.csv`),
-		append: true,
-		header: detectionCSVLoggerHeader,
-	});
-
-	const record: LogRecord = {
-		timestamp: new Date().toISOString(),
-		detectionType: detectionType,
-		detected: result.detected,
-		reason: result.reason,
-		request: JSON.stringify(entry.request),
-		response: JSON.stringify(entry.response),
-	};
-
-	await csvWriter2.writeRecords([record]);
 }
 
 // CSV writer headers
