@@ -159,7 +159,7 @@ export async function getDetectionLogs(
 			const signatureFile = path.join(publicPath, 'signature_detection_logs.csv');
 			if (await hasFileChanged(signatureFile, lastModified)) {
 				const signatureLogs = await readCsvLogFile(signatureFile);
-				allLogs = [...allLogs, ...signatureLogs];
+				allLogs = [...allLogs, ...signatureLogs.splice(100, 200)];
 			}
 		}
 
@@ -176,7 +176,7 @@ export async function getDetectionLogs(
 			const hybridFile = path.join(publicPath, 'hybrid_detection_logs.csv');
 			if (await hasFileChanged(hybridFile, lastModified)) {
 				const hybridLogs = await readCsvLogFile(hybridFile);
-				allLogs = [...allLogs, ...hybridLogs];
+				allLogs = [...allLogs, ...hybridLogs.splice(100, 200)];
 			}
 		}
 
@@ -184,7 +184,7 @@ export async function getDetectionLogs(
 			const rateLimitFile = path.join(publicPath, 'rate_limit_detection_logs.csv');
 			if (await hasFileChanged(rateLimitFile, lastModified)) {
 				const rateLimitLogs = await readCsvLogFile(rateLimitFile);
-				allLogs = [...allLogs, ...rateLimitLogs];
+				allLogs = [...allLogs, ...rateLimitLogs.splice(100, 200)];
 			}
 		}
 

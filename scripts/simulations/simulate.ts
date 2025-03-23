@@ -11,6 +11,11 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
+// Get URLs from environment or use default for local development
+const CA_API_URL = process.env.CA_API_URL || 'http://localhost:3000';
+const IP_API_URL = process.env.ANYA_BANK_API || 'http://localhost:4000';
+const MO_API_URL = process.env.BOND_BANK_API || 'http://localhost:4200';
+
 export type BodyIA102 = {
 	sign_tx_id: string;
 	user_ci: string;
@@ -117,7 +122,7 @@ export const getIA101 = async (orgCode: string, clientId: string, clientSecret: 
 			}),
 		};
 		console.log('requesting token from certification authority');
-		const response = await fetch('http://localhost:3000/api/oauth/2.0/token', options);
+		const response = await fetch(`${CA_API_URL}/api/oauth/2.0/token`, options);
 
 		if (!response.ok) {
 			// Handle HTTP errors
@@ -146,7 +151,7 @@ export const getIA102 = async (accessToken: string, body: BodyIA102, orgCode: st
 	};
 
 	console.log('requesting sign request from certification authority');
-	const response = await fetch(`http://localhost:3000/api/ca/sign_request`, options);
+	const response = await fetch(`${CA_API_URL}/api/ca/sign_request`, options);
 
 	if (!response.ok) {
 		// Handle HTTP errors
@@ -170,7 +175,7 @@ export const getIA103 = async (accessToken: string, body: BodyIA103, orgCode: st
 		body: JSON.stringify(body),
 	};
 	console.log('requesting sign result from certification authority');
-	const response = await fetch(`http://localhost:3000/api/ca/sign_result`, options);
+	const response = await fetch(`${CA_API_URL}/api/ca/sign_result`, options);
 
 	if (!response.ok) {
 		// Handle HTTP errors
@@ -189,7 +194,17 @@ export const getIA002 = async (body: BodyIA002, otherBankAPI: string, orgCode: s
 		},
 		body: new URLSearchParams(body),
 	};
-	const response = await fetch(`${otherBankAPI}/api/oauth/2.0/token`, options);
+
+	// Use the container API URL based on which bank we're calling
+	let apiUrl = otherBankAPI;
+	if (otherBankAPI.includes('4000')) {
+		apiUrl = IP_API_URL;
+	} else if (otherBankAPI.includes('4200')) {
+		apiUrl = MO_API_URL;
+	}
+
+	console.log(`Requesting token from ${apiUrl}/api/oauth/2.0/token`);
+	const response = await fetch(`${apiUrl}/api/oauth/2.0/token`, options);
 
 	if (!response.ok) {
 		// Handle HTTP errors
@@ -211,7 +226,7 @@ export const getIA104 = async (accessToken: string, body: BodyIA104, orgCode: st
 		body: JSON.stringify(body),
 	};
 
-	const response = await fetch(`http://localhost:3000/api/ca/sign_verification`, options);
+	const response = await fetch(`${CA_API_URL}/api/ca/sign_verification`, options);
 	const res = await response.json();
 	return res;
 };
@@ -233,7 +248,7 @@ export async function getSupport001(orgCode: string, clientId: string, clientSec
 			}),
 		};
 
-		const response = await fetch('http://localhost:3000/api/v2/mgmts/oauth/2.0/token', options);
+		const response = await fetch(`${CA_API_URL}/api/v2/mgmts/oauth/2.0/token`, options);
 
 		if (!response.ok) {
 			// Handle HTTP errors
@@ -263,7 +278,7 @@ export async function getSupport002(orgCode: string, clientId: string, clientSec
 		},
 	};
 
-	const response = await fetch(`http://localhost:3000/api/v2/mgmts/orgs?search_timestamp=`, options);
+	const response = await fetch(`${CA_API_URL}/api/v2/mgmts/orgs?search_timestamp=`, options);
 
 	if (!response.ok) {
 		// Handle HTTP errors
@@ -482,7 +497,16 @@ const getAccountsBasic = async (
 		}),
 	};
 
-	const response = await fetch(`${otherBankAPI}/api/v2/bank/accounts/deposit/basic`, options);
+	// Use the container API URL based on which bank we're calling
+	let apiUrl = otherBankAPI;
+	if (otherBankAPI.includes('4000')) {
+		apiUrl = IP_API_URL;
+	} else if (otherBankAPI.includes('4200')) {
+		apiUrl = MO_API_URL;
+	}
+
+	console.log(`Requesting account basic from ${apiUrl}/api/v2/bank/accounts/deposit/basic`);
+	const response = await fetch(`${apiUrl}/api/v2/bank/accounts/deposit/basic`, options);
 	if (!response.ok) {
 		// Handle HTTP errors
 		throw new Error(`HTTP error! Status: ${response.status}`);
@@ -515,7 +539,16 @@ const getAccountsDetail = async (
 		}),
 	};
 
-	const response = await fetch(`${otherBankAPI}/api/v2/bank/accounts/deposit/detail`, options);
+	// Use the container API URL based on which bank we're calling
+	let apiUrl = otherBankAPI;
+	if (otherBankAPI.includes('4000')) {
+		apiUrl = IP_API_URL;
+	} else if (otherBankAPI.includes('4200')) {
+		apiUrl = MO_API_URL;
+	}
+
+	console.log(`Requesting account detail from ${apiUrl}/api/v2/bank/accounts/deposit/detail`);
+	const response = await fetch(`${apiUrl}/api/v2/bank/accounts/deposit/detail`, options);
 	if (!response.ok) {
 		// Handle HTTP errors
 		throw new Error(`HTTP error! Status: ${response.status}`);
@@ -715,15 +748,23 @@ export async function runIterations(
 	console.log('All iterations completed.');
 }
 
-// // Only run if this is the main module
-// if (require.main === module) {
-// 	// Run the iterations
-// 	runIterations()
-// 		.catch((e) => {
-// 			console.error('Error during iterations:', e);
-// 			process.exit(1);
-// 		})
-// 		.finally(async () => {
-// 			await prisma.$disconnect();
-// 		});
-// }
+// If this script is run directly, execute with the following parameters
+if (require.main === module) {
+	// Default values
+	const iterations = 1;
+	const orgCode = process.env.BOND_ORG_CODE || 'bond123456';
+	const clientId = process.env.BOND_CLIENT_ID || 'xv9gqz7mb4t2o5wcf8rjy6kphudsnea0l3ytkpdhqrvcxz1578';
+	const clientSecret = process.env.BOND_CLIENT_SECRET || 'm4q7xv9zb2tgc8rjy6kphudsnea0l3ow5ytkpdhqrvcfz926bt';
+	const otherOrgCode = process.env.ANYA_ORG_CODE || 'anya123456';
+	const otherBankAPI = process.env.ANYA_BANK_API || 'http://information-provider:4000';
+
+	console.log('Starting simulation with parameters:');
+	console.log(`Iterations: ${iterations}`);
+	console.log(`Org Code: ${orgCode}`);
+	console.log(`Other Org Code: ${otherOrgCode}`);
+	console.log(`Other Bank API: ${otherBankAPI}`);
+
+	runIterations(iterations, orgCode, clientId, clientSecret, otherOrgCode, otherBankAPI)
+		.then(() => console.log('Simulation complete.'))
+		.catch((error) => console.error('Error running simulation:', error));
+}
