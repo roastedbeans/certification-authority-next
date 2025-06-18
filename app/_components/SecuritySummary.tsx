@@ -21,6 +21,11 @@ export default function SecuritySummary() {
 		hybridDetections: 0,
 	});
 	const [loading, setLoading] = useState(true);
+	const [isClient, setIsClient] = useState(false);
+
+	useEffect(() => {
+		setIsClient(true);
+	}, []);
 
 	useEffect(() => {
 		const fetchStats = async () => {
@@ -34,15 +39,17 @@ export default function SecuritySummary() {
 			}
 		};
 
-		fetchStats();
-
-		const interval = setInterval(() => {
-			console.log('fetching stats');
+		if (isClient) {
 			fetchStats();
-		}, 5000);
 
-		return () => clearInterval(interval);
-	}, []);
+			const interval = setInterval(() => {
+				console.log('fetching stats');
+				fetchStats();
+			}, 5000);
+
+			return () => clearInterval(interval);
+		}
+	}, [isClient]);
 
 	const chartData = [
 		{ name: 'Total Logs', value: stats?.total },

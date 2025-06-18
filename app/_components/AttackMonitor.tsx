@@ -30,6 +30,11 @@ const LogMonitor = () => {
 	const [specificationLogs, setSpecificationLogs] = useState<LogRecord[]>([]);
 	const [signatureLogs, setSignatureLogs] = useState<LogRecord[]>([]);
 	const [hybridLogs, setHybridLogs] = useState<LogRecord[]>([]);
+	const [isClient, setIsClient] = useState(false);
+
+	useEffect(() => {
+		setIsClient(true);
+	}, []);
 
 	useEffect(() => {
 		const fetchLogs = async (
@@ -42,23 +47,25 @@ const LogMonitor = () => {
 				const csvText = await res.text();
 				const { data } = Papa.parse(csvText, { header: true, skipEmptyLines: true });
 
-				const indexedData = parseData(data).filter((_, index) => index < 10000);
+				const indexedData = parseData(data).filter((_, index) => index < 24868);
 				setState(indexedData);
 			} catch (err) {
 				console.error(err);
 			}
 		};
 
-		const parseLogData = (data: any[]) => data.map((item: any, index: number) => ({ ...item, index: index }));
+		if (isClient) {
+			const parseLogData = (data: any[]) => data.map((item: any, index: number) => ({ ...item, index: index }));
 
-		const timeout = setInterval(async () => {
-			await fetchLogs('/ca_formatted_logs.csv', setLogs, parseLogData);
-			await fetchLogs('/specification_detection_logs.csv', setSpecificationLogs, parseLogData);
-			await fetchLogs('/signature_detection_logs.csv', setSignatureLogs, parseLogData);
-			await fetchLogs('/hybrid_detection_logs.csv', setHybridLogs, parseLogData);
-		}, 2000);
-		return () => clearInterval(timeout);
-	}, []);
+			const timeout = setInterval(async () => {
+				await fetchLogs('/ca_formatted_logs.csv', setLogs, parseLogData);
+				await fetchLogs('/specification_detection_logs.csv', setSpecificationLogs, parseLogData);
+				await fetchLogs('/signature_detection_logs.csv', setSignatureLogs, parseLogData);
+				await fetchLogs('/hybrid_detection_logs.csv', setHybridLogs, parseLogData);
+			}, 2000);
+			return () => clearInterval(timeout);
+		}
+	}, [isClient]);
 
 	return (
 		<div className='flex gap-4 w-full max-h-screen p-16 mx-auto'>

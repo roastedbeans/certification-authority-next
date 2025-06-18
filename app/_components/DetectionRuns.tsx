@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
 	runSignatureDetection,
 	runSpecificationDetection,
@@ -16,6 +16,11 @@ export default function DetectionRuns() {
 	const [result, setResult] = useState<DetectionResult | null>(null);
 	const [output, setOutput] = useState<string>('');
 	const [analysisSummary, setAnalysisSummary] = useState<DetectionSummary | null>(null);
+	const [isClient, setIsClient] = useState(false);
+
+	useEffect(() => {
+		setIsClient(true);
+	}, []);
 
 	const handleRun = async (type: string, action: () => Promise<any>) => {
 		setLoading(type);
@@ -23,17 +28,19 @@ export default function DetectionRuns() {
 		setOutput('');
 
 		try {
-			const result = await action();
+			if (isClient) {
+				const result = await action();
 
-			console.log('result', result);
-			setResult(result);
+				console.log('result', result);
+				setResult(result);
 
-			if (type === 'analysis') {
-				setAnalysisSummary(result.data);
-				// Don't set output for analysis as it's a complex object
-				setOutput('Analysis complete. See summary below.');
-			} else {
-				setOutput(result.data || '');
+				if (type === 'analysis') {
+					setAnalysisSummary(result.data);
+					// Don't set output for analysis as it's a complex object
+					setOutput('Analysis complete. See summary below.');
+				} else {
+					setOutput(result.data || '');
+				}
 			}
 		} catch (error) {
 			// console.error(`Error running ${type} detection:`, error);

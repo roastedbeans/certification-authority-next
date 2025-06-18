@@ -140,6 +140,11 @@ export default function ApiLogsViewer() {
 	const [error, setError] = useState<string | null>(null);
 	const [logType, setLogType] = useState<'all' | 'signature' | 'specification' | 'hybrid'>('all');
 	const [expandedLog, setExpandedLog] = useState<number | null>(null);
+	const [isClient, setIsClient] = useState(false);
+
+	useEffect(() => {
+		setIsClient(true);
+	}, []);
 
 	useEffect(() => {
 		const fetchLogs = async () => {
@@ -161,13 +166,15 @@ export default function ApiLogsViewer() {
 			}
 		};
 
-		fetchLogs();
+		if (isClient) {
+			fetchLogs();
+		}
 		// const interval = setInterval(() => {
 		// 	fetchLogs();
 		// }, 5000);
 
 		// return () => clearInterval(interval);
-	}, [logType]);
+	}, [logType, isClient]);
 
 	const toggleExpand = (index: number) => {
 		setExpandedLog(expandedLog === index ? null : index);

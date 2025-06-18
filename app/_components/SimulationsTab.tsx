@@ -26,6 +26,11 @@ export default function SimulationsTab() {
 	const [showConfig, setShowConfig] = useState(false);
 	const [iterations, setIterations] = useState(5); // Default number of iterations
 	const [progress, setProgress] = useState({ current: 0, total: 0 });
+	const [isClient, setIsClient] = useState(false);
+
+	useEffect(() => {
+		setIsClient(true);
+	}, []);
 
 	// Default configuration values
 	const [config, setConfig] = useState<ConfigVars>({
@@ -55,21 +60,23 @@ export default function SimulationsTab() {
 	useEffect(() => {
 		const updateConfig = async () => {
 			try {
-				const newConfig = await getVariables(direction);
-				setConfig(newConfig);
+				if (isClient) {
+					const newConfig = await getVariables(direction);
+					setConfig(newConfig);
+				}
 			} catch (error) {
 				console.error('Error updating config:', error);
 			}
 		};
 
 		updateConfig();
-	}, [direction]);
+	}, [direction, isClient]);
 
 	// Poll for simulation status when running
 	useEffect(() => {
 		let interval: NodeJS.Timeout;
 
-		if (isRunning) {
+		if (isRunning && isClient) {
 			interval = setInterval(async () => {
 				try {
 					const status = await getSimulationStatus();
@@ -93,7 +100,7 @@ export default function SimulationsTab() {
 		return () => {
 			if (interval) clearInterval(interval);
 		};
-	}, [isRunning, progress.current, progress.total]);
+	}, [isRunning, progress.current, progress.total, isClient]);
 
 	// Handle config field changes
 	const handleConfigChange = (key: string, value: string) => {
@@ -220,7 +227,7 @@ export default function SimulationsTab() {
 		}
 	};
 
-	const runSimulationHandler = async (type: 'normal' | 'attack') => {
+	const runSimulationHandler = async (type: 'normal' | 'attack' | 'attack-invalid-flow') => {
 		try {
 			// Reset state
 			setIsRunning(true);
@@ -432,6 +439,15 @@ export default function SimulationsTab() {
 								className='flex items-center space-x-2'>
 								{isRunning && !isPaused ? <Loader className='h-4 w-4 animate-spin' /> : <Play size={16} />}
 								<span>Run Attack Simulation</span>
+							</Button>
+
+							<Button
+								onClick={() => runSimulationHandler('attack-invalid-flow')}
+								disabled={isRunning || iterations === 0}
+								variant='destructive'
+								className='flex items-center space-x-2'>
+								{isRunning && !isPaused ? <Loader className='h-4 w-4 animate-spin' /> : <Play size={16} />}
+								<span>Run Attack Invalid Flow Simulation</span>
 							</Button>
 
 							{/* Pause/Resume Button */}

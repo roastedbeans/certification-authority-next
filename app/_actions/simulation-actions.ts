@@ -2,11 +2,14 @@
 
 import { runIterations } from '@/scripts/simulations/simulate';
 import { runAttackIterations } from '@/scripts/simulations/simulateV2';
+// import { runAttackSimulations } from '@/scripts/simulations/simulate-invalid-flow';
+import { runMixedSequenceBypassDataset } from '@/scripts/simulations/simulate-flow-attack';
+import { runIterations as runIterationsInvalidFlow } from '@/scripts/simulations/simulate-invalid-flow-v3';
 import fs from 'fs';
 import path from 'path';
 
 export type Direction = 'anya-to-bond' | 'bond-to-anya';
-export type SimulationType = 'normal' | 'attack';
+export type SimulationType = 'normal' | 'attack' | 'attack-invalid-flow';
 
 export type ConfigVars = {
 	otherBankAPI: string;
@@ -202,7 +205,7 @@ export async function runSimulation(params: {
 						console.error('Error running normal iteration:', error);
 						throw error;
 					}
-				} else {
+				} else if (type === 'attack') {
 					try {
 						// Run a single attack iteration by calling the runAttackIterations function with iterations=1
 						await runAttackIterations(
@@ -215,6 +218,21 @@ export async function runSimulation(params: {
 						);
 					} catch (error) {
 						console.error('Error running attack iteration:', error);
+						throw error;
+					}
+				} else if (type === 'attack-invalid-flow') {
+					try {
+						// Run a single attack invalid flow iteration by calling the runAttackSimulations function with iterations=1
+						await runIterationsInvalidFlow(
+							1,
+							envVars.orgCode,
+							envVars.clientId,
+							envVars.clientSecret,
+							envVars.otherOrgCode,
+							envVars.otherBankAPI
+						);
+					} catch (error) {
+						console.error('Error running attack invalid flow iteration:', error);
 						throw error;
 					}
 				}

@@ -12,9 +12,9 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 // Get URLs from environment or use default for local development
-const CA_API_URL = process.env.CA_API_URL || 'http://localhost:3000';
-const IP_API_URL = process.env.ANYA_BANK_API || 'http://localhost:4000';
-const MO_API_URL = process.env.BOND_BANK_API || 'http://localhost:4200';
+export const CA_API_URL = process.env.CA_API_URL || 'http://localhost:3000';
+export const IP_API_URL = process.env.ANYA_BANK_API || 'http://localhost:4000';
+export const MO_API_URL = process.env.BOND_BANK_API || 'http://localhost:4200';
 
 export type BodyIA102 = {
 	sign_tx_id: string;

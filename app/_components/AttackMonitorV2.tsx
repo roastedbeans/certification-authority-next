@@ -223,7 +223,7 @@ const ConfusionMatrixVisualizer = ({
 			}
 
 			falseNegatives = attackCount - truePositives;
-			trueNegatives = 10000 - truePositives - falsePositives - falseNegatives;
+			trueNegatives = 24868 - truePositives - falsePositives - falseNegatives;
 			console.log('true negative', trueNegatives);
 		});
 

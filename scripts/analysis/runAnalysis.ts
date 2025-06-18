@@ -74,7 +74,7 @@ class LogAnalyzer {
 		specificationLogPath: string = filePath('/public/specification_detection_logs.csv'),
 		signatureLogPath: string = filePath('/public/signature_detection_logs.csv'),
 		hybridLogPath: string = filePath('/public/hybrid_detection_logs.csv'),
-		maxRecords: number = 10000
+		maxRecords: number = 24868
 	) {
 		this.logPath = logPath;
 		this.specificationLogPath = specificationLogPath;
@@ -258,7 +258,7 @@ export async function analyzeSecurityLogs(
 	signatureLogPath: string = filePath('/public/signature_detection_logs.csv'),
 	specificationLogPath: string = filePath('/public/specification_detection_logs.csv'),
 	hybridLogPath: string = filePath('/public/hybrid_detection_logs.csv'),
-	maxRecords: number = 10000
+	maxRecords: number = 24868
 ): Promise<DetectionSummary> {
 	try {
 		const analyzer = new LogAnalyzer(mainLogPath, specificationLogPath, signatureLogPath, hybridLogPath, maxRecords);

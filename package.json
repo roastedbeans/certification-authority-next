@@ -9,14 +9,13 @@
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",
-		"seedCA": "npx tsx scripts/seedCA.ts",
-		"seedOrg": "npx tsx scripts/seedOrg.ts",
-		"hybrid": "npx tsx scripts/detectionHybrid.ts",
-		"specification": "npx tsx scripts/detectionSpecification.ts",
-		"signature": "npx tsx scripts/detectionSignature.ts",
-		"analysis": "npx tsx scripts/analysis.ts",
-		"detection": "npx tsx scripts/detectionSpecification.ts",
-		"ratelimit": "npx tsx scripts/rateLimitAll.ts"
+		"seedCA": "npx tsx scripts/data-seeder/seedCA.ts",
+		"seedOrg": "npx tsx scripts/data-seeder/seedOrg.ts",
+		"hybrid": "npx tsx scripts/detection-algorithms/detectionHybrid.ts",
+		"specification": "npx tsx scripts/detection-algorithms/detectionSpecification.ts",
+		"signature": "npx tsx scripts/detection-algorithms/detectionSignature.ts",
+		"ratelimit": "npx tsx scripts/detection-algorithms/slidingWindowRateLimit.ts",
+		"analysis": "npx tsx scripts/analysis/analysis.ts"
 	},
 	"dependencies": {
 		"@faker-js/faker": "^9.4.0",
