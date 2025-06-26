@@ -13,6 +13,10 @@ import { startRateLimitDetection } from '@/scripts/detection-algorithms/slidingW
 
 const execPromise = promisify(exec);
 
+// Track timing statistics across all detection methods
+let totalExecutionTime = 0;
+let totalDetectionRuns = 0;
+
 // Path helpers
 const publicPath = path.join(process.cwd(), 'public');
 const logsPath = path.join(process.cwd(), 'logs');
@@ -37,6 +41,7 @@ export interface DetectionResult {
 	data?: any;
 	error?: string;
 	executionTime?: number; // Time in milliseconds
+	averageTimePerRequest?: number; // Average time in milliseconds
 }
 
 export interface LogEntry {
@@ -56,12 +61,20 @@ export async function runSignatureDetection(): Promise<DetectionResult> {
 	const endTime = performance.now();
 	const executionTime = Math.round(endTime - startTime);
 
+	// Update timing statistics
+	totalExecutionTime += executionTime;
+	totalDetectionRuns++;
+	const averageTimePerRequest = totalExecutionTime / totalDetectionRuns;
+
 	if (data === 'done') {
 		return {
 			success: true,
-			message: `Signature-based detection completed successfully in ${executionTime}ms, please check the logs in Log Viewer for more details`,
+			message: `Signature-based detection completed successfully in ${executionTime}ms (avg: ${averageTimePerRequest.toFixed(
+				8
+			)}ms), please check the logs in Log Viewer for more details`,
 			data: data,
 			executionTime: executionTime,
+			averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 		};
 	} else {
 		return {
@@ -69,6 +82,7 @@ export async function runSignatureDetection(): Promise<DetectionResult> {
 			message: 'Signature-based detection failed',
 			error: data,
 			executionTime: executionTime,
+			averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 		};
 	}
 }
@@ -81,12 +95,20 @@ export async function runSpecificationDetection(): Promise<DetectionResult> {
 	const endTime = performance.now();
 	const executionTime = Math.round(endTime - startTime);
 
+	// Update timing statistics
+	totalExecutionTime += executionTime;
+	totalDetectionRuns++;
+	const averageTimePerRequest = totalExecutionTime / totalDetectionRuns;
+
 	if (data === 'done') {
 		return {
 			success: true,
-			message: `Specification-based detection completed successfully in ${executionTime}ms, please check the logs in Log Viewer for more details`,
+			message: `Specification-based detection completed successfully in ${executionTime}ms (avg: ${averageTimePerRequest.toFixed(
+				8
+			)}ms), please check the logs in Log Viewer for more details`,
 			data: data,
 			executionTime: executionTime,
+			averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 		};
 	} else {
 		return {
@@ -94,6 +116,7 @@ export async function runSpecificationDetection(): Promise<DetectionResult> {
 			message: 'Specification-based detection failed',
 			error: data,
 			executionTime: executionTime,
+			averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 		};
 	}
 }
@@ -107,19 +130,28 @@ export async function runHybridDetection(): Promise<DetectionResult> {
 	const endTime = performance.now();
 	const executionTime = endTime - startTime;
 
+	// Update timing statistics
+	totalExecutionTime += executionTime;
+	totalDetectionRuns++;
+	const averageTimePerRequest = totalExecutionTime / totalDetectionRuns;
+
 	if (data === 'done') {
 		return {
 			success: true,
-			message: `Hybrid detection completed successfully in ${executionTime}ms, please check the logs in Log Viewer for more details`,
+			message: `Hybrid detection completed successfully in ${executionTime.toFixed(
+				8
+			)}ms (avg: ${averageTimePerRequest.toFixed(8)}ms), please check the logs in Log Viewer for more details`,
 			data: data,
-			executionTime: executionTime,
+			executionTime: Math.round(executionTime * 100) / 100,
+			averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 		};
 	} else {
 		return {
 			success: false,
 			message: 'Hybrid detection failed',
 			error: data,
-			executionTime: executionTime,
+			executionTime: Math.round(executionTime * 100) / 100,
+			averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 		};
 	}
 }
@@ -158,31 +190,46 @@ export async function runRateLimitDetection(): Promise<DetectionResult> {
 		const endTime = performance.now();
 		const executionTime = endTime - startTime;
 
+		// Update timing statistics
+		totalExecutionTime += executionTime;
+		totalDetectionRuns++;
+		const averageTimePerRequest = totalExecutionTime / totalDetectionRuns;
+
 		if (data === 'done') {
 			return {
 				success: true,
-				message: `Rate limit detection completed successfully in ${executionTime}ms, please check the logs in Log Viewer for more details`,
+				message: `Rate limit detection completed successfully in ${executionTime.toFixed(
+					8
+				)}ms (avg: ${averageTimePerRequest.toFixed(8)}ms), please check the logs in Log Viewer for more details`,
 				data: data,
-				executionTime: executionTime,
+				executionTime: Math.round(executionTime * 100) / 100,
+				averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 			};
 		} else {
 			return {
 				success: false,
 				message: 'Rate limit detection failed',
 				error: data,
-				executionTime: executionTime,
+				executionTime: Math.round(executionTime * 100) / 100,
+				averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 			};
 		}
 	} catch (error: any) {
 		const endTime = performance.now();
 		const executionTime = endTime - startTime;
 
+		// Update timing statistics even for failed runs
+		totalExecutionTime += executionTime;
+		totalDetectionRuns++;
+		const averageTimePerRequest = totalExecutionTime / totalDetectionRuns;
+
 		console.error('Error running rate limit detection:', error);
 		return {
 			success: false,
 			message: 'Rate limit detection failed',
 			error: error.message,
-			executionTime: executionTime,
+			executionTime: Math.round(executionTime * 100) / 100,
+			averageTimePerRequest: Math.round(averageTimePerRequest * 100) / 100,
 		};
 	}
 }

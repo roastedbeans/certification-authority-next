@@ -50,9 +50,24 @@ export class SignatureBasedDetection {
 // Main Detection Function
 async function detectIntrusions(entry: LogEntry): Promise<void> {
 	try {
+		// Start timing for overall request processing
+		const requestStartTime = performance.now();
+
 		const detector = new SignatureBasedDetection();
 		const result = detector.detect(entry);
+
+		const requestEndTime = performance.now();
+		const totalRequestDuration = requestEndTime - requestStartTime;
+
 		await logDetectionResult(entry, 'signature', result);
+
+		console.log(`########## Signature Detection Processing Time: ${totalRequestDuration.toFixed(10)}ms ##########`);
+		if (result.detected) {
+			console.log('⚠️ SIGNATURE-BASED INTRUSION DETECTED ⚠️');
+			console.log(`Reason: ${result.reason}`);
+		} else {
+			console.log('✅ No attack signatures detected');
+		}
 	} catch (error) {
 		console.error('Error in intrusion detection:', error);
 	}

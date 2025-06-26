@@ -610,11 +610,17 @@ export class SpecificationBasedDetection {
 // Main Detection Function
 async function detectIntrusions(entry: LogEntry): Promise<void> {
 	try {
+		// Start timing for overall request processing
+		const requestStartTime = performance.now();
+
 		console.log('--------------------------------------------------');
 		console.log(`Processing request to: ${entry.request.url}`);
 
 		const specificationDetector = new SpecificationBasedDetection();
 		const specificationResult = specificationDetector.detect(entry);
+
+		const requestEndTime = performance.now();
+		const totalRequestDuration = requestEndTime - requestStartTime;
 
 		if (specificationResult.detected) {
 			await logDetectionResult(entry, 'specification', specificationResult);
@@ -626,6 +632,8 @@ async function detectIntrusions(entry: LogEntry): Promise<void> {
 			await logDetectionResult(entry, 'specification', specificationResult);
 			console.log('✅ Request conforms to specifications');
 		}
+
+		console.log(`########## Specification Detection Processing Time: ${totalRequestDuration.toFixed(10)}ms ##########`);
 		console.log('--------------------------------------------------');
 	} catch (error) {
 		console.error('Error in detectIntrusions:', error);

@@ -2,34 +2,66 @@ import { filePath, LogEntry, FilePosition, initializeCSV, readNewCSVLogEntries, 
 import { SpecificationBasedDetection } from './detectionSpecification';
 import { SignatureBasedDetection } from './detectionSignature';
 
+// Track timing statistics
+let totalProcessingTime = 0;
+let totalRequestsProcessed = 0;
+
 // Main Detection Function
 async function detectIntrusions(entry: LogEntry): Promise<void> {
+	const requestStartTime = performance.now();
+
 	const specificationDetector = new SpecificationBasedDetection();
+
+	// Start timing for specification-based detection
+	const specificationStartTime = performance.now();
 	const specificationResult = specificationDetector.detect(entry);
+	const specificationEndTime = performance.now();
+	const specificationDuration = specificationEndTime - specificationStartTime;
 
 	if (specificationResult.detected) {
 		console.log('########## Primary (Specification-based) Security Complete! ##########');
+		console.log(`########## Specification Detection Time: ${specificationDuration.toFixed(10)}ms ##########`);
 		await logDetectionResult(entry, 'hybrid', specificationResult);
 		console.log('########## ⚠️ Intrusion Detected! ##########');
 		console.log('Specification-based:', specificationResult);
 	} else {
 		// await logDetectionResult(entry, 'Specification', specificationResult);
 		console.log('########## Primary (Specification-based) Security Complete! ##########');
+		console.log(`########## Specification Detection Time: ${specificationDuration.toFixed(10)}ms ##########`);
 		console.log('########## Initializing Secondary (Signature-based) Detection! ##########');
 		console.log('########## Matching attack patterns... ##########');
+
 		const signatureDetector = new SignatureBasedDetection();
+
+		// Start timing for signature-based detection
+		const signatureStartTime = performance.now();
 		const signatureResult = signatureDetector.detect(entry);
+		const signatureEndTime = performance.now();
+		const signatureDuration = signatureEndTime - signatureStartTime;
 
 		if (signatureResult.detected) {
 			await logDetectionResult(entry, 'hybrid', signatureResult);
 			console.log('########## ⚠️ Intrusion Detected! ##########');
 			console.log('Signature-based:', signatureResult);
+			console.log(`########## Signature Detection Time: ${signatureDuration.toFixed(10)}ms ##########`);
 			console.log('########## Secondary (Signature-based) Security Complete! ##########');
 		} else {
 			await logDetectionResult(entry, 'hybrid', signatureResult);
+			console.log(`########## Signature Detection Time: ${signatureDuration.toFixed(10)}ms ##########`);
 			console.log('########## Secondary (Signature-based) Security Complete! ##########');
 		}
 	}
+
+	const requestEndTime = performance.now();
+	const requestDuration = requestEndTime - requestStartTime;
+
+	// Update timing statistics
+	totalProcessingTime += requestDuration;
+	totalRequestsProcessed++;
+
+	const currentAverage = totalProcessingTime / totalRequestsProcessed;
+	console.log(`########## Total Request Processing Time: ${requestDuration.toFixed(10)}ms ##########`);
+	console.log(`########## Average Time Per Request: ${currentAverage.toFixed(10)}ms ##########`);
 }
 
 // Main Function to Start Detection
