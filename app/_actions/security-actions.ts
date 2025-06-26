@@ -303,7 +303,7 @@ async function readCsvLogFile(filePath: string): Promise<LogEntry[]> {
 				const entry: any = {};
 
 				headers.forEach((header, index) => {
-					let value = values[index] || '';
+					const value = values[index] || '';
 					entry[header] = value;
 				});
 
