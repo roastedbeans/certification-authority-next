@@ -36,6 +36,7 @@ export interface DetectionResult {
 	message: string;
 	data?: any;
 	error?: string;
+	executionTime?: number; // Time in milliseconds
 }
 
 export interface LogEntry {
@@ -48,102 +49,140 @@ export interface LogEntry {
 }
 
 export async function runSignatureDetection(): Promise<DetectionResult> {
+	const startTime = performance.now();
+
 	const data = await startSignatureDetection(filePath('/public/ca_formatted_logs.csv'));
+
+	const endTime = performance.now();
+	const executionTime = Math.round(endTime - startTime);
 
 	if (data === 'done') {
 		return {
 			success: true,
-			message: 'Signature-based detection completed successfully, please check the logs in Log Viewer for more details',
+			message: `Signature-based detection completed successfully in ${executionTime}ms, please check the logs in Log Viewer for more details`,
 			data: data,
+			executionTime: executionTime,
 		};
 	} else {
 		return {
 			success: false,
 			message: 'Signature-based detection failed',
 			error: data,
+			executionTime: executionTime,
 		};
 	}
 }
 
 export async function runSpecificationDetection(): Promise<DetectionResult> {
+	const startTime = performance.now();
+
 	const data = await startSpecificationDetection(filePath('/public/ca_formatted_logs.csv'));
+
+	const endTime = performance.now();
+	const executionTime = Math.round(endTime - startTime);
 
 	if (data === 'done') {
 		return {
 			success: true,
-			message:
-				'Specification-based detection completed successfully, please check the logs in Log Viewer for more details',
+			message: `Specification-based detection completed successfully in ${executionTime}ms, please check the logs in Log Viewer for more details`,
 			data: data,
+			executionTime: executionTime,
 		};
 	} else {
 		return {
 			success: false,
 			message: 'Specification-based detection failed',
 			error: data,
+			executionTime: executionTime,
 		};
 	}
 }
 
 export async function runHybridDetection(): Promise<DetectionResult> {
+	const startTime = performance.now();
+
 	// Run with a timeout to prevent hanging
 	const data = await startHybridDetection(filePath('/public/ca_formatted_logs.csv'));
+
+	const endTime = performance.now();
+	const executionTime = endTime - startTime;
 
 	if (data === 'done') {
 		return {
 			success: true,
-			message: 'Hybrid detection completed successfully, please check the logs in Log Viewer for more details',
+			message: `Hybrid detection completed successfully in ${executionTime}ms, please check the logs in Log Viewer for more details`,
 			data: data,
+			executionTime: executionTime,
 		};
 	} else {
 		return {
 			success: false,
 			message: 'Hybrid detection failed',
 			error: data,
+			executionTime: executionTime,
 		};
 	}
 }
 
 export async function runAnalysis(): Promise<DetectionResult> {
+	const startTime = performance.now();
+
 	const summary = await analyzeSecurityLogs();
+
+	const endTime = performance.now();
+	const executionTime = endTime - startTime;
 
 	if (summary) {
 		return {
 			success: true,
-			message: 'Analysis completed successfully',
+			message: `Analysis completed successfully in ${executionTime}ms`,
 			data: summary,
+			executionTime: executionTime,
 		};
 	} else {
 		return {
 			success: false,
 			message: 'Analysis failed',
+			executionTime: executionTime,
 		};
 	}
 }
 
 export async function runRateLimitDetection(): Promise<DetectionResult> {
+	const startTime = performance.now();
+
 	try {
 		// Run sliding window rate limit detection
 		const data = await startRateLimitDetection();
 
+		const endTime = performance.now();
+		const executionTime = endTime - startTime;
+
 		if (data === 'done') {
 			return {
 				success: true,
-				message: 'Rate limit detection completed successfully, please check the logs in Log Viewer for more details',
+				message: `Rate limit detection completed successfully in ${executionTime}ms, please check the logs in Log Viewer for more details`,
 				data: data,
+				executionTime: executionTime,
 			};
 		} else {
 			return {
 				success: false,
 				message: 'Rate limit detection failed',
 				error: data,
+				executionTime: executionTime,
 			};
 		}
 	} catch (error: any) {
+		const endTime = performance.now();
+		const executionTime = endTime - startTime;
+
 		console.error('Error running rate limit detection:', error);
 		return {
 			success: false,
 			message: 'Rate limit detection failed',
 			error: error.message,
+			executionTime: executionTime,
 		};
 	}
 }
