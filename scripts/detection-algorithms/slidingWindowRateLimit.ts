@@ -339,6 +339,7 @@ function analyzeTimeframeAnomaly(timeframe: TimeframeAnalysis, requestStore: Map
 		return {
 			detected: true,
 			reason: `High sustained traffic: ${requestsPerMinute.toFixed(1)} req/min (limit: ${applicableLimit} req/min)`,
+			isAttack: false,
 		};
 	}
 
@@ -353,8 +354,9 @@ function analyzeTimeframeAnomaly(timeframe: TimeframeAnalysis, requestStore: Map
 			return {
 				detected: true,
 				reason: `Client rate limit exceeded: ${minuteCount} requests in last minute (limit: ${clientLimit})`,
+				isAttack: false,
 			};
-		}
+		}	
 	}
 
 	if (requestStore.has(endpointKey)) {
@@ -363,6 +365,7 @@ function analyzeTimeframeAnomaly(timeframe: TimeframeAnalysis, requestStore: Map
 			return {
 				detected: true,
 				reason: `Endpoint rate limit exceeded: ${minuteCount} requests in last minute to ${timeframe.endpoint} (limit: ${endpointLimit})`,
+				isAttack: false,
 			};
 		}
 	}
@@ -371,6 +374,7 @@ function analyzeTimeframeAnomaly(timeframe: TimeframeAnalysis, requestStore: Map
 	return {
 		detected: false,
 		reason: 'Normal traffic pattern',
+		isAttack: false,
 	};
 }
 
@@ -573,6 +577,7 @@ export async function startRateLimitDetection(
 					const detectionResult: DetectionResult = {
 						detected: true,
 						reason: reason,
+						isAttack: false,
 					};
 
 					await logDetectionResult(entry, 'ratelimit', detectionResult);

@@ -41,6 +41,7 @@ export interface LogEntry {
 export interface DetectionResult {
 	detected: boolean;
 	reason: string;
+	isAttack: boolean;
 }
 
 export interface LogRecord {
@@ -48,6 +49,7 @@ export interface LogRecord {
 	detectionType: 'signature' | 'specification' | 'hybrid' | 'ratelimit';
 	detected: boolean;
 	reason: string;
+	isAttack: boolean;
 	request: string;
 	response: string;
 }
@@ -299,6 +301,7 @@ export async function logDetectionResult(
 			detectionType: detectionType,
 			detected: result.detected,
 			reason: result.reason,
+			isAttack: result.isAttack,
 			request: JSON.stringify(entry.request),
 			response: JSON.stringify(entry.response),
 		};
@@ -338,6 +341,7 @@ export const detectionCSVLoggerHeader = [
 	{ id: 'detectionType', title: 'detectionType' },
 	{ id: 'detected', title: 'detected' },
 	{ id: 'reason', title: 'reason' },
+	{ id: 'isAttack', title: 'isAttack' },
 	{ id: 'request', title: 'request' },
 	{ id: 'response', title: 'response' },
 ];

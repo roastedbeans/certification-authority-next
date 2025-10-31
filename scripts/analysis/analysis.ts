@@ -48,7 +48,7 @@ class LogMonitor {
 		specificationLogPath: string = filePath('/public/specification_detection_logs.csv'),
 		signatureLogPath: string = filePath('/public/signature_detection_logs.csv'),
 		hybridLogPath: string = filePath('/public/hybrid_detection_logs.csv'),
-		maxRecords: number = 24868
+		maxRecords: number = 1567
 	) {
 		this.logPath = logPath;
 		this.specificationLogPath = specificationLogPath;
@@ -300,7 +300,7 @@ const monitor = new LogMonitor(
 	filePath('/public/signature_detection_logs.csv'),
 	filePath('/public/specification_detection_logs.csv'),
 	filePath('/public/hybrid_detection_logs.csv'),
-	24868
+	1567
 );
 monitor.start(360000);
 

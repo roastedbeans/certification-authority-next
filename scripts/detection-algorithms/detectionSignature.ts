@@ -28,6 +28,7 @@ export class SignatureBasedDetection {
 						return {
 							detected: true,
 							reason: `Signature match: ${category} pattern detected: ${pattern}`,
+							isAttack: true, // Signature matches are definite attacks
 						};
 					}
 				}
@@ -36,12 +37,14 @@ export class SignatureBasedDetection {
 			return {
 				detected: false,
 				reason: 'No known attack signatures detected',
+				isAttack: false, // No signatures detected
 			};
 		} catch (error) {
 			console.error('Error in signature detection:', error);
 			return {
 				detected: false,
 				reason: `Error during detection: ${error instanceof Error ? error.message : String(error)}`,
+				isAttack: false, // Errors are not attacks
 			};
 		}
 	}

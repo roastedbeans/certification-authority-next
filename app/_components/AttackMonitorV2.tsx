@@ -499,7 +499,7 @@ const ConfusionMatrixVisualizer = ({
 							<div className='bg-blue-50 p-4 rounded-lg border border-blue-200'>
 								<h4 className='font-medium text-blue-700 mb-2'>Specification Detection</h4>
 								<p className='text-sm text-gray-600'>
-									Uses API specifications to detect anomalies in requests that don't conform to expected patterns.
+									Uses API specifications to detect anomalies in requests that don&apos;t conform to expected patterns.
 								</p>
 								<div className='mt-3 font-semibold text-blue-700'>
 									{specMatrix?.accuracy ? `${(specMatrix.accuracy * 100).toFixed(1)}%` : '-'} accuracy

@@ -39,7 +39,15 @@ export const securityPatterns = {
 		/window\.open/i,
 		/<img.*?src=.*?onerror=.*?>/i,
 	],
-	xxe: [/<!DOCTYPE.*?SYSTEM/i, /<!ENTITY.*?SYSTEM/i, /<!\[CDATA\[.*?\]\]>/i],
+	xxe: [
+		/<!DOCTYPE.*?SYSTEM/i,
+		/<!ENTITY.*?SYSTEM/i,
+		/<!\[CDATA\[.*?\]\]>/i,
+		/<xi:include/i,
+		/xmlns:xi=/i,
+		/parse="text"/i,
+		/href="file:\/\//i,
+	],
 	commandInjection: [/\s*\|\s*(\w+)/i, /`.*?`/, /\$\(.*?\)/, /&&[\s\w\/]+/i, /\|\|[\s\w\/]+/i],
 	directoryTraversal: [
 		/\.\.\//,
@@ -67,7 +75,15 @@ export const securityPatterns = {
 		/\.jar$/i,
 		/\.war$/i,
 	],
-	cookieInjection: [/document\.cookie.*?=/i],
+	cookieInjection: [
+		/document\.cookie.*?=/i,
+		/session=.*?;/i,
+		/isAdmin=.*?;/i,
+		/admin=.*?;/i,
+		/HttpOnly/i,
+		/Secure/i,
+		/SameSite/i,
+	],
 	maliciousHeaders: [/X-Forwarded-Host:\s*[^.]+\.[^.]+\.[^.]+/i],
 	ssrf: [
 		/127\.0\.0\.1/i,
@@ -77,5 +93,10 @@ export const securityPatterns = {
 		/172\.(1[6-9]|2[0-9]|3[0-1])\./i,
 		/169\.254\./i,
 		/x00/i,
+	],
+	payloadOverflow: [
+		/.{10000,}/,  // Very long strings (10k+ characters)
+		/\d{1000,}/,  // Very long numbers
+		/[a-zA-Z]{5000,}/,  // Very long alphabetic strings
 	],
 };
